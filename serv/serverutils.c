@@ -1,5 +1,205 @@
 #include "serverutils.h"
 
+//if return == NULL error 
+photo* create_photo_list(char *name){
+
+  photo* head = (photo*)malloc(sizeof(photo));
+  if(head == NULL){
+    printf("Error creating photo list\n");
+    return NULL;
+  }
+  strcpy(head->name,name);
+  head->identifier = 0;
+  head->key_header = NULL;
+  head->next = NULL;
+
+  return head;
+
+}
+
+//insert at the end of the list, 1 -> error, 0 ->sucesssfull
+int add_photo(photo* head,char *name){
+
+  int photo_count = 0;
+  photo* aux = head;
+  //empty list
+  if(head != NULL){
+    photo_count++;
+    while(aux->next != NULL){
+      aux = aux->next;
+      photo_count++;
+    }
+  }
+  photo* new_photo;
+  new_photo = (photo*)malloc(sizeof(photo));
+  if(new_photo == NULL){
+    printf("Error creating photo\n");
+    return(1);
+  }
+
+  new_photo->identifier = photo_count;
+  strcpy(new_photo->name, name);
+  new_photo->key_header = NULL;
+  new_photo-> next = NULL;
+
+  if(photo_count==0)
+    head = new_photo;
+  else
+    aux->next = new_photo;
+
+  return 0;
+}
+
+// 1 -> error, 0 ->sucesssfull
+int add_keyword(photo* head,uint32_t identifier, char *keyword_input){
+
+  //first search for photo
+  if(head == NULL){
+    printf("Empty list\n");
+    return(1);
+
+  }
+  photo* aux = head;
+
+  while(aux->next != NULL){
+
+    //photo found add keyword
+    if(identifier == aux->identifier){
+
+      keyword* new_keyword;
+      new_keyword = (keyword*)malloc(sizeof(keyword));
+      if(new_keyword == NULL){
+        printf("Error creating keyword\n");
+        return(1);
+      }
+      strcpy(new_keyword->name, keyword_input);
+      new_keyword->next = NULL;
+
+      if(aux->key_header == NULL){
+        aux->key_header = new_keyword;
+      }else{
+        keyword *aux_keyword = aux->key_header;
+        while(aux_keyword->next != NULL){
+
+          //keyword duplicates not allowed
+          if(strcmp(keyword_input, aux_keyword->name) == 0){
+            printf("keyword already in photo\n");
+            free(new_keyword);
+            return(1);
+          }
+          aux_keyword = aux_keyword->next;
+        }
+
+        aux_keyword->next = new_keyword;
+      }
+      return(0);
+    }
+    aux = aux->next;
+  }
+  printf("Photo not found!\n");
+  return(1);
+}
+
+// -1 -> error, 0 ->no photos integer->number of photos count
+int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword_input){
+
+  //create id_photos to do..??
+
+  if(head == NULL){
+    printf("Empty list\n");
+    return(0);
+  }
+
+  photo* aux = head;
+  keyword* keyword_aux = NULL;
+  int photo_count = 0;
+
+  while(aux->next != NULL){
+    keyword_aux = aux->key_header;
+    while(keyword_aux->next != NULL){
+      if(strcmp(keyword_input, keyword_aux->name) == 0){
+        photo_count++;
+        // add to the id_photos
+      }
+      keyword_aux = keyword_aux->next;
+    }
+
+  }
+
+  return(photo_count);
+}
+
+
+// 0 ->no photo 1->sucesssfull
+int delete_photo(photo* head, uint32_t identifier){
+
+  if(head == NULL){
+    printf("Empty list\n");
+    return(0);
+  }
+
+  photo *aux1 = head;
+  photo *aux2 = head;
+
+  while(aux1->next != NULL){
+    if(identifier == aux1->identifier){
+      aux2->next = aux1->next;
+      return(1);
+    }
+    aux2 = aux1;
+    aux1 = aux1->next;
+  }
+  return(0);
+}
+
+// 0 ->no photo 1->sucesssfull
+int gallery_get_photo_name(photo* head, uint32_t id_photo,char **photo_name){
+
+  if(head==NULL){
+    printf("Empty list\n");
+    return(0);
+  }
+
+  photo * aux = head;
+
+  while(aux->next != NULL){
+    if(aux->identifier== id_photo){
+      //get photo name to photo_name var to return
+      return(1);
+    }
+  }
+  return(0);
+}
+
+// 0 ->no photo 1->sucesssfull, change return or parameters to send photo data to do...
+//talvez o melhor seja receber a socket e enviar dentro da func
+int gallery_get_photo(photo* head, uint32_t id_photo){
+
+  if(head==NULL){
+    printf("Empty list\n");
+    return(0);
+  }
+
+  photo * aux = head;
+
+  while(aux->next != NULL){
+    if(aux->identifier== id_photo){
+      //get photo data and sent to client
+      return(1);
+    }
+  }
+  return(0);
+
+}
+
+void galley_clean_list(photo * head){
+
+}
+
+void keyword_clean_list(keyword * head){
+
+}
+
 
 void * handle_client(void * arg){
 
