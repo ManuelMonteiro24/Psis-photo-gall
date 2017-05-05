@@ -111,15 +111,15 @@ int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
     perror("Write: ");
     return(-1);
   }
-  printf("sent %d %s\n", nbytes, m.buffer);
+  printf("sent %d %s\n", nbytes, buffer);
 
   /* receive confirmation to do... */
-  nbytes = read(peer_socket, m.buffer, nbytes);
+  nbytes = read(peer_socket, buffer, nbytes);
   if(nbytes< 0){
     perror("Read: ");
     return(-1);
   }
-  printf("received %d bytes : %s", nbytes,  m.buffer);
+  printf("received %d bytes : %s", nbytes,  buffer);
 
   //return sucess or no photo found
   return(1);
@@ -138,15 +138,15 @@ int gallery_search_photo(int peer_socket, char * keyword,
          perror("Write: ");
          return(-1);
        }
-       printf("sent %d %s\n", nbytes, m.buffer);
+       printf("sent %d %s\n", nbytes, buffer);
 
        /* receive photos identifier to do... */
-       nbytes = read(peer_socket, m.buffer, nbytes);
+       nbytes = read(peer_socket, buffer, nbytes);
        if(nbytes< 0){
          perror("Read: ");
          return(-1);
        }
-       printf("received %d bytes : %s", nbytes,  m.buffer);
+       printf("received %d bytes : %s", nbytes,  buffer);
 
        //return number of photos found to do...
        return(1);

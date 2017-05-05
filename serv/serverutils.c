@@ -31,7 +31,7 @@ int add_photo(photo* head,char *name){
   new_photo-> next = NULL;
 
   if(photo_count==0)
-    head = new_photo;
+    *head = new_photo;
   else
     aux->next = new_photo;
 
