@@ -4,6 +4,7 @@
 
 int main(int argc, char *argv[]){
 
+    char buffer[BUFFERSIZE];
 
     if (argc < 3) {
        fprintf(stderr,"usage gatewayhostname gatewayport\n");
@@ -19,6 +20,17 @@ int main(int argc, char *argv[]){
       fprintf(stderr,"Gateway cannot be accessed\n");
       exit(1);
     }
+
+    /*
+    printf("Insert name of photo file to add to gallery: \n");
+    fgets(buffer, BUFFERSIZE, stdin);
+
+    int photo_id = gallery_add_photo(sock_fd,buffer);
+    if(photo_id == 0){
+      fprintf(stderr,"Photo insertion as failed!\n");
+      exit(1);
+    }
+    */
 
     close(sock_fd);
     exit(0);

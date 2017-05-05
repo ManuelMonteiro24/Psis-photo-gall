@@ -1,8 +1,8 @@
 CFLAGS = -g -Wall
 OPTIONS = -pthread
 
-server:
+all:
 				gcc $(FLAGS) server.c serverutils.c -o server $(OPTIONS)
 
 clean:
-				rm server
+				rm *o server

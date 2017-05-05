@@ -1,6 +1,8 @@
 #ifndef CLIENTAPI
 #define CLIENTAPI
 
+#define BUFFERSIZE 100
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

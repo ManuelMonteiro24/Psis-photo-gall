@@ -77,7 +77,7 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-    //erro a passar pointer
+    //erro a passar pointer, mas acho que tem que se mudar para shared variable a lista
     struct workerArgs *wa;
     servernode* head = create_server_list();
     wa = malloc(sizeof(struct workerArgs));
@@ -106,10 +106,10 @@ int main(int argc, char *argv[]){
 
     while(1){
 
-      //best way to shut down the threads
+      //best way to shut down the threads ????
       //ctrl-c pressed!
         if(flag ==1){
-          clean_server_list(head);
+
           close(sock_fd);
           close(sock_peers);
           int s = pthread_cancel(thread_id0);
@@ -118,12 +118,12 @@ int main(int argc, char *argv[]){
           if(s != 0) perror("peers thread cancel: ");
           free(wa);
           free(wa1);
+          clean_server_list(head);
           exit(0);
-          //clear list to do...
         }
 
     }
-    // nunca vai para aqui
+    // never goes here!
     return 0;
 
 }

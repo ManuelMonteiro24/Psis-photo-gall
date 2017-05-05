@@ -77,7 +77,6 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
     return 0;
   }
   //get photo to do...
-
   printf("message: ");
   fgets(m.buffer, MESSAGE_LEN, stdin);
 
@@ -101,18 +100,40 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
   return(1);
 }
 
+int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
+  char buffer[BUFFERSIZE];
+  int nbytes;
+
+  //send keyword and photoid to do...
+  strcpy(buffer, keyword);
+  nbytes = write(peer_socket,buffer, BUFFERSIZE);
+  if(nbytes< 0){
+    perror("Write: ");
+    return(-1);
+  }
+  printf("sent %d %s\n", nbytes, m.buffer);
+
+  /* receive confirmation to do... */
+  nbytes = read(peer_socket, m.buffer, nbytes);
+  if(nbytes< 0){
+    perror("Read: ");
+    return(-1);
+  }
+  printf("received %d bytes : %s", nbytes,  m.buffer);
+
+  //return sucess or no photo found
+  return(1);
+}
+
 int gallery_search_photo(int peer_socket, char * keyword,
      uint32_t ** id_photos){
 
-       message m;
+       char buffer[BUFFERSIZE];
        int nbytes;
 
        //send keyword
-       printf("message: ");
-       strcpy(m.buffer, keyword);
-
-       /* send keyword to do... */
-       nbytes = write(peer_socket, m.buffer, MESSAGE_LEN);
+       strcpy(buffer, keyword);
+       nbytes = write(peer_socket,buffer, BUFFERSIZE);
        if(nbytes< 0){
          perror("Write: ");
          return(-1);

@@ -1,8 +1,8 @@
 CFLAGS = -g -Wall
 OPTIONS = -pthread
 
-gateway:
+all:
 				gcc $(FLAGS) gateway.c gatewayutils.c -o gateway $(OPTIONS)
 
 clean:
-				rm server
+				rm *o gateway
