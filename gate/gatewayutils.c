@@ -7,21 +7,30 @@ servernode* create_server_list(){
 
 //-1-> error 0->sucess
 //de momento esta a permitir duplicados change to do,..
-//insert on the head of the list
+//insert at the end of the list
 int insert_server(servernode* head, char* address, int port){
 
-  servernode *aux = (servernode*) malloc(sizeof(servernode));
-  if(aux == NULL){
+  servernode *new_server = (servernode*) malloc(sizeof(servernode));
+  if(new_server == NULL){
     printf("Error creating server\n");
     return(-1);
   }
 
-  strcpy(aux->address, address);
-  aux->port = port;
-  aux->next = head;
-  aux->available = 1;
+  strcpy(new_server->address, address);
+  new_server->port = port;
+  new_server->next = NULL;
+  new_server->available = 1;
 
-  head = aux;
+  if(head == NULL){
+    head=new_server;
+    return(0);
+  }
+
+  servernode* aux = head;
+  while( aux->next != NULL){
+    aux = aux->next;
+  }
+  aux->next = new_server;
   return(0);
 }
 
@@ -91,10 +100,14 @@ int find_server(servernode* head, message_gw* mssg){
 
 void print_server_list(servernode* head){
   servernode * aux = head;
-  printf("Server List:\n");
-  while(aux != NULL){
-    printf("address %s port %d available %d\n",aux->address, aux->port, aux->available);
-    aux = aux->next;
+  printf("Server List:");
+  if(aux == NULL){
+    printf("Empty list\n");
+  }else{
+    while(aux != NULL){
+      printf(" address %s port %d available %d\n",aux->address, aux->port, aux->available);
+      aux = aux->next;
+    }
   }
 }
 
@@ -115,7 +128,8 @@ void * client_server(void * arg){
   struct workerArgs *wa;
   wa = (struct workerArgs*) arg;
   int sock_fd = wa->sock;
-  severnode* head = wa->list;
+  servernode* head;
+  head = wa->list;
 
   message_gw auxm;
   message_gw* mssg_pointer;
@@ -153,7 +167,8 @@ void * peers_server(void * arg){
   struct workerArgs *wa;
   wa = (struct workerArgs*) arg;
   int sock_fd = wa->sock;
-  severnode *head = wa->list;
+  servernode *head;
+  head = wa->list;
 
   message_gw auxm;
   message m;
@@ -167,14 +182,14 @@ void * peers_server(void * arg){
 
     //process message, process for server avalbility to do...
     if(auxm.type ==1){
-      insert_server(head,auxm.address,auxm.port);
+      printf("Server insertion: %d\n", insert_server(head,auxm.address,auxm.port));
       print_server_list(head);
     }else if(auxm.type == 3){
       modifyavail_server(head, auxm.address, auxm.port, 0);
       print_server_list(head);
     }else if(auxm.type == 4){
-      modifyavail(head,auxm.address, auxm.port, 1);
-      printlist(head);
+      modifyavail_server(head,auxm.address, auxm.port, 1);
+      print_server_list(head);
     }else{
       delete_server(head,auxm.address, auxm.port);
       print_server_list(head);
