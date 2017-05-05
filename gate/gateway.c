@@ -1,9 +1,5 @@
 #include "gatewayutils.h"
 
-servernode *head = NULL;
-int countservers = 0;
-
-
 volatile sig_atomic_t flag = 0;
 void my_handler(int sig){
   flag = 1;
@@ -81,14 +77,26 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-    if(pthread_create(&thread_id, NULL, client_server, (void*) &sock_fd) != 0){
+    //erro a passar pointer
+    struct workerArgs *wa;
+    servernode* head = create_server_list();
+    wa = malloc(sizeof(struct workerArgs));
+    wa->sock = sock_fd;
+    wa->list = head;
+
+    if(pthread_create(&thread_id, NULL, client_server,wa) != 0){
       perror("Could not create clients thread");
       close(sock_fd);
       close(sock_peers);
       exit(-1);
     }
 
-    if(pthread_create(&thread_id0, NULL, peers_server, (void*) &sock_peers) != 0){
+    struct workerArgs *wa1;
+    wa1 = malloc(sizeof(struct workerArgs));
+    wa1->sock = sock_peers;
+    wa1->list = head;
+
+    if(pthread_create(&thread_id0, NULL, peers_server,wa1) != 0){
       perror("Could not create peers thread");
       close(sock_fd);
       close(sock_peers);
@@ -101,12 +109,15 @@ int main(int argc, char *argv[]){
       //best way to shut down the threads
       //ctrl-c pressed!
         if(flag ==1){
+          clean_server_list(head);
           close(sock_fd);
           close(sock_peers);
           int s = pthread_cancel(thread_id0);
           if(s != 0) perror("server thread cancel: ");
           s = pthread_cancel(thread_id);
           if(s != 0) perror("peers thread cancel: ");
+          free(wa);
+          free(wa1);
           exit(0);
           //clear list to do...
         }

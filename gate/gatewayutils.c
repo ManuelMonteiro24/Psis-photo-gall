@@ -1,9 +1,20 @@
 #include "gatewayutils.h"
 
-//de momento esta a permitir duplicados
-void insert(char* address, int port){
+//creates empty list
+servernode* create_server_list(){
+  return NULL;
+}
+
+//-1-> error 0->sucess
+//de momento esta a permitir duplicados change to do,..
+//insert on the head of the list
+int insert_server(servernode* head, char* address, int port){
 
   servernode *aux = (servernode*) malloc(sizeof(servernode));
+  if(aux == NULL){
+    printf("Error creating server\n");
+    return(-1);
+  }
 
   strcpy(aux->address, address);
   aux->port = port;
@@ -11,63 +22,84 @@ void insert(char* address, int port){
   aux->available = 1;
 
   head = aux;
-  countservers++;
+  return(0);
 }
 
-//1 -> sucesssfull delete
-void delete(char* address, int port){
+//-1->error 0-> sucesssfull delete
+int delete_server(servernode* head, char* address, int port){
 
   servernode *aux = head;
   servernode *aux0= head;
 
+  //Empty list
   if(head == NULL)
-    return;
-
-  if(countservers == 1){
-    head = NULL;
-    return;
-  }
+    return(-1);
 
   while(aux !=NULL){
     if( (strcmp(address, aux->address)==0) && (port == aux->port)){
+      //server foun
       aux0->next = aux->next;
-      countservers--;
-      return;
+      return(0);
     }
     aux0 = aux;
     aux= aux->next;
 
   }
-  return;
+  //no server found
+  return(-1);
 }
 
-void modifyavail(char* address, int port, int newstate){
+//-1 error 0->sucess
+int modifyavail_server(servernode* head, char* address, int port, int newstate){
 
   servernode *aux = head;
 
   if(head == NULL)
-    return;
+    return(-1);
 
   while(aux !=NULL){
-    if( strcmp(address, aux->address)==0 && port == aux->port){
+    if(strcmp(address, aux->address)==0 && port == aux->port){
       aux->available = newstate;
-      return;
+      return(0);
     }
     aux = aux->next;
   }
+  //no server found
+  return(-1);
 }
 
-void printlist(){
-  servernode * aux = head;
+//-1 error 0->sucess
+int find_server(servernode* head, message_gw* mssg){
+  //get a server a give to client
+  servernode *aux = head;
+  int flagaux = 0;
+  while(flagaux == 0 && aux != NULL){
+    if(aux->available ==1){
+      mssg->type = 0;
+      strcpy(mssg->address,aux->address);
+      mssg->port = aux->port;
+      return(0);
+    }
+    aux = aux->next;
+  }
+  //No server available
+  mssg->type =2 ;
+  strcpy(mssg->address,"");
+  mssg->port =0;
+  return(-1);
+}
 
+void print_server_list(servernode* head){
+  servernode * aux = head;
+  printf("Server List:\n");
   while(aux != NULL){
     printf("address %s port %d available %d\n",aux->address, aux->port, aux->available);
     aux = aux->next;
   }
 }
 
-void cleanlist(){
-  servernode * aux = head, *aux1;
+void clean_server_list(servernode* head){
+  servernode * aux = head, *aux1 = head;
 
   while(aux != NULL){
     aux1 = aux;
@@ -76,12 +108,17 @@ void cleanlist(){
   }
 }
 
+//erro a passar pointer
 void * client_server(void * arg){
 
   // get arguments
-  int sock_fd = *(int*)arg;
+  struct workerArgs *wa;
+  wa = (struct workerArgs*) arg;
+  int sock_fd = wa->sock;
+  severnode* head = wa->list;
 
   message_gw auxm;
+  message_gw* mssg_pointer;
   message m;
   struct sockaddr_in client_addr;
   servernode *auxpointer = NULL;
@@ -98,34 +135,14 @@ void * client_server(void * arg){
     //process message, process for server avalbility to do...
     if(auxm.type ==0){
       //case for no servers on list
-      if(countservers ==0){
-        auxm.type = 2;
-      }else{
-        //get a server a give to client
-        auxpointer = head;
-        flagaux = 0;
-        while(flagaux == 0 && auxpointer != NULL){
-          if(auxpointer->available ==1){
-            auxm.type = 0;
-            strcpy(auxm.address,auxpointer->address);
-            auxm.port = auxpointer->port;
-            flagaux = 1;
-          }else{
-            auxpointer = auxpointer->next;
-          }
-        }
-        if(flagaux == 0){
-          auxm.type =2 ;
-          strcpy(auxm.address,"");
-          auxm.port =0;
-        }
-      }
+        *mssg_pointer = auxm;
+        find_server(head,mssg_pointer);
+    }
       //send answer for clients
       nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
       if( nbytes< 0) perror("Write: ");
        printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
     }
-  }
 
   pthread_exit(NULL);
 }
@@ -133,7 +150,10 @@ void * client_server(void * arg){
 void * peers_server(void * arg){
 
   // get arguments
-  int sock_fd = *(int*)arg;
+  struct workerArgs *wa;
+  wa = (struct workerArgs*) arg;
+  int sock_fd = wa->sock;
+  severnode *head = wa->list;
 
   message_gw auxm;
   message m;
@@ -147,21 +167,17 @@ void * peers_server(void * arg){
 
     //process message, process for server avalbility to do...
     if(auxm.type ==1){
-      insert(auxm.address,auxm.port);
-      printf("Server List:\n");
-      printlist();
+      insert_server(head,auxm.address,auxm.port);
+      print_server_list(head);
     }else if(auxm.type == 3){
-      modifyavail(auxm.address, auxm.port, 0);
-      printf("Server List:\n");
-      printlist();
+      modifyavail_server(head, auxm.address, auxm.port, 0);
+      print_server_list(head);
     }else if(auxm.type == 4){
-      modifyavail(auxm.address, auxm.port, 1);
-      printf("Server List:\n");
-      printlist();
+      modifyavail(head,auxm.address, auxm.port, 1);
+      printlist(head);
     }else{
-      delete(auxm.address, auxm.port);
-      printf("Server List:\n");
-      printlist();
+      delete_server(head,auxm.address, auxm.port);
+      print_server_list(head);
     }
   }
   pthread_exit(NULL);

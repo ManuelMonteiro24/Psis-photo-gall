@@ -26,15 +26,24 @@ typedef struct servernode{
   struct servernode *next;
 }servernode;
 
-void insert(char* address, int port);
+typedef struct workerArgs{
+  int sock;
+  struct servernode *list;
+}workerArgs;
 
-void delete(char* address, int port);
+servernode* create_server_list();
 
-void modifyavail(char* address, int port, int newstate);
+int insert_server(servernode* head, char* address, int port);
 
-void printlist();
+int delete_server(servernode* head, char* address, int port);
 
-void cleanlist();
+int modifyavail_server(servernode* head, char* address, int port, int newstate);
+
+int find_server(servernode* head, message_gw* mssg);
+
+void print_server_list(servernode* head);
+
+void clean_server_list(servernode* head);
 
 void * client_server(void * arg);
 

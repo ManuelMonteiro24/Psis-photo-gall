@@ -1,20 +1,8 @@
 #include "serverutils.h"
 
-//if return == NULL error 
+//create empty list
 photo* create_photo_list(char *name){
-
-  photo* head = (photo*)malloc(sizeof(photo));
-  if(head == NULL){
-    printf("Error creating photo list\n");
-    return NULL;
-  }
-  strcpy(head->name,name);
-  head->identifier = 0;
-  head->key_header = NULL;
-  head->next = NULL;
-
-  return head;
-
+  return NULL;
 }
 
 //insert at the end of the list, 1 -> error, 0 ->sucesssfull
@@ -22,10 +10,10 @@ int add_photo(photo* head,char *name){
 
   int photo_count = 0;
   photo* aux = head;
-  //empty list
+
+
   if(head != NULL){
-    photo_count++;
-    while(aux->next != NULL){
+    while(aux != NULL){
       aux = aux->next;
       photo_count++;
     }
@@ -61,7 +49,7 @@ int add_keyword(photo* head,uint32_t identifier, char *keyword_input){
   }
   photo* aux = head;
 
-  while(aux->next != NULL){
+  while(aux != NULL){
 
     //photo found add keyword
     if(identifier == aux->identifier){
@@ -79,7 +67,7 @@ int add_keyword(photo* head,uint32_t identifier, char *keyword_input){
         aux->key_header = new_keyword;
       }else{
         keyword *aux_keyword = aux->key_header;
-        while(aux_keyword->next != NULL){
+        while(aux_keyword!= NULL){
 
           //keyword duplicates not allowed
           if(strcmp(keyword_input, aux_keyword->name) == 0){
@@ -114,16 +102,16 @@ int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword_input){
   keyword* keyword_aux = NULL;
   int photo_count = 0;
 
-  while(aux->next != NULL){
+  while(aux != NULL){
     keyword_aux = aux->key_header;
-    while(keyword_aux->next != NULL){
+    while(keyword_aux != NULL){
       if(strcmp(keyword_input, keyword_aux->name) == 0){
         photo_count++;
         // add to the id_photos
       }
       keyword_aux = keyword_aux->next;
     }
-
+    aux = aux->next;
   }
 
   return(photo_count);
@@ -141,7 +129,7 @@ int delete_photo(photo* head, uint32_t identifier){
   photo *aux1 = head;
   photo *aux2 = head;
 
-  while(aux1->next != NULL){
+  while(aux1!= NULL){
     if(identifier == aux1->identifier){
       aux2->next = aux1->next;
       return(1);
@@ -162,11 +150,12 @@ int gallery_get_photo_name(photo* head, uint32_t id_photo,char **photo_name){
 
   photo * aux = head;
 
-  while(aux->next != NULL){
+  while(aux!= NULL){
     if(aux->identifier== id_photo){
       //get photo name to photo_name var to return
       return(1);
     }
+  aux = aux->next;
   }
   return(0);
 }
@@ -182,22 +171,52 @@ int gallery_get_photo(photo* head, uint32_t id_photo){
 
   photo * aux = head;
 
-  while(aux->next != NULL){
+  while(aux!=NULL){
     if(aux->identifier== id_photo){
       //get photo data and sent to client
       return(1);
     }
+    aux = aux->next;
   }
   return(0);
 
 }
 
-void galley_clean_list(photo * head){
+//debug
+void print_list(photo * head){
 
+  photo* aux = head;
+  keyword *aux2 = NULL;
+  while (aux!=NULL) {
+    printf("photo: iden %d name %s keyword's:",aux->identifier,aux->name);
+    aux2 = aux->key_header;
+    if(aux2 != NULL){
+      while(aux2 != NULL){
+        printf(" %s", aux2->name);
+        aux2=aux2->next;
+      }
+    }
+    aux = aux->next;
+  }
+}
+
+void gallery_clean_list(photo * head){
+  photo* aux = head, *aux1;
+  while(aux !=NULL){
+    aux1 = aux;
+    aux = aux->next;
+    keyword_clean_list(aux1->key_header);
+    free(aux1);
+  }
 }
 
 void keyword_clean_list(keyword * head){
-
+  keyword* aux = head, *aux1;
+  while(aux !=NULL){
+    aux1 = aux;
+    aux = aux->next;
+    free(aux1);
+  }
 }
 
 
