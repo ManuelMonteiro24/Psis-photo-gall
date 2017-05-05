@@ -69,19 +69,24 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
 
   message m;
   int nbytes;
+  struct photo photo_aux;
 
   //process photo file
-  FILE * f =  fopen("file_name","r");
+  //error opening file dunno why???????????????????
+  /*
+  FILE *f=fopen(file_name,"r");
   if(f==NULL){
     perror("Photo file: ");
     return 0;
   }
+  fclose(f);
+  */
   //get photo to do...
-  printf("message: ");
-  fgets(m.buffer, MESSAGE_LEN, stdin);
+  photo_aux.type = 0;
+  strcpy(photo_aux.name,file_name);
 
   /* send photo to do... */
-  nbytes = write(peer_socket, m.buffer, MESSAGE_LEN);
+  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
   if(nbytes< 0){
     perror("Write: ");
     return(0);
@@ -89,7 +94,7 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
   printf("sent %d %s\n", nbytes, m.buffer);
 
   /* receive photo identifier to do... */
-  nbytes = read(peer_socket, m.buffer, nbytes);
+  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
   if(nbytes< 0){
     perror("Read: ");
     return(0);
@@ -97,7 +102,7 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
   printf("received %d bytes : %s", nbytes,  m.buffer);
 
   //return photo idetifier to do...
-  return(1);
+  return(photo_aux.type);
 }
 
 int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){

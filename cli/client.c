@@ -21,7 +21,6 @@ int main(int argc, char *argv[]){
       exit(1);
     }
 
-    /*
     printf("Insert name of photo file to add to gallery: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
@@ -30,7 +29,6 @@ int main(int argc, char *argv[]){
       fprintf(stderr,"Photo insertion as failed!\n");
       exit(1);
     }
-    */
 
     close(sock_fd);
     exit(0);

@@ -13,4 +13,12 @@ typedef struct message_gw{
    char address[20];
    int port;
 } message_gw;
-#pragma pack(0)
+
+typedef struct photo{
+  int type; //0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
+  uint32_t identifier;
+  char name[20];
+  struct keyword * key_header;
+  //falta binary data
+  struct photo *next;
+}photo;

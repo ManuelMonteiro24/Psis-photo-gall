@@ -25,6 +25,7 @@ typedef struct workerArgs{
 }workerArgs;
 
 typedef struct photo{
+  int type; //0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
   uint32_t identifier;
   char name[20];
   struct keyword * key_header;
@@ -38,6 +39,7 @@ typedef struct keyword{
 }keyword;
 
 photo* create_photo_list();
+/*
 int add_photo(photo* head,char *name);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword);
@@ -48,5 +50,5 @@ void print_list(photo * head);
 void gallery_clean_list(photo * head);
 void keyword_clean_list(keyword * head);
 void * handle_client(void * arg);
-
+*/
 #endif
