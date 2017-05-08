@@ -18,6 +18,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 
+
 //serverlist
 typedef struct servernode{
   char address[20];
@@ -33,21 +34,21 @@ typedef struct workerArgs{
 
 servernode* create_server_list();
 
+
+int insert_server(servernode **head,char* address, int port);
+
+int delete_server(servernode **head,char* address, int port);
+
+int modifyavail_server(servernode *head,char* address, int port, int newstate);
+
+int find_server(servernode *head,message_gw* mssg);
+
+void print_server_list(servernode *head);
+
+void clean_server_list(servernode *head);
 /*
-int insert_server(char* address, int port);
-
-int delete_server(char* address, int port);
-
-int modifyavail_server(char* address, int port, int newstate);
-
-int find_server(message_gw* mssg);
-
-void print_server_list();
-
-void clean_server_list();
-*/
 void * client_server(void * arg);
 
 void * peers_server(void * arg);
-
+*/
 #endif

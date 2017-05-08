@@ -7,135 +7,11 @@ void my_handler(int sig){
 
 servernode* head = NULL;
 
-//-1-> error 0->sucess
-//de momento esta a permitir duplicados change to do,..
-//insert at the end of the list
-int insert_server(char* address, int port){
-
-  servernode *new_server = (servernode*) malloc(sizeof(servernode));
-  if(new_server == NULL){
-    printf("Error creating server\n");
-    return(-1);
-  }
-
-  strcpy(new_server->address, address);
-  new_server->port = port;
-  new_server->next = NULL;
-  new_server->available = 1;
-
-  if(head == NULL){
-    head = new_server;
-    return(0);
-  }
-
-  servernode* aux = head;
-  while( aux->next != NULL){
-    aux = aux->next;
-  }
-  aux->next = new_server;
-  return(0);
-}
-
-//-1->error 0-> sucesssfull delete
-int delete_server( char* address, int port){
-
-  servernode *aux = head;
-  servernode *aux0= head;
-
-  //Empty list
-  if(head == NULL)
-    return(-1);
-
-  if((head->next ==NULL) && (strcmp(address, head->address)==0) && (port == head->port)){
-    head=NULL;
-    return(0);
-  }
-
-
-  while(aux !=NULL){
-    if((strcmp(address, aux->address)==0) && (port == aux->port)){
-      //server found
-      aux0->next = aux->next;
-      return(0);
-    }
-    aux0 = aux;
-    aux= aux->next;
-
-  }
-  //no server found
-  return(-1);
-}
-
-//-1 error 0->sucess
-int modifyavail_server( char* address, int port, int newstate){
-
-  servernode *aux = head;
-
-  if(head == NULL)
-    return(-1);
-
-  while(aux !=NULL){
-    if(strcmp(address, aux->address)==0 && port == aux->port){
-      aux->available = newstate;
-      return(0);
-    }
-    aux = aux->next;
-  }
-  //no server found
-  return(-1);
-}
-
-//-1 error 0->sucess
-int find_server( message_gw* mssg){
-  //get a server a give to client
-  servernode *aux = head;
-  int flagaux = 0;
-  while(flagaux == 0 && aux != NULL){
-    if(aux->available ==1){
-      mssg->type = 0;
-      strcpy(mssg->address,aux->address);
-      mssg->port = aux->port;
-      return(0);
-    }
-    aux = aux->next;
-  }
-  //No server available
-  mssg->type =2 ;
-  strcpy(mssg->address,"");
-  mssg->port =0;
-  return(-1);
-}
-
-void print_server_list(){
-  servernode * aux = head;
-  printf("Server List:");
-  if(aux == NULL){
-    printf("Empty list\n");
-  }else{
-    while(aux != NULL){
-      printf(" address %s port %d available %d\n",aux->address, aux->port, aux->available);
-      aux = aux->next;
-    }
-  }
-}
-
-void clean_server_list(){
-  servernode * aux = head, *aux1 = head;
-
-  while(aux != NULL){
-    aux1 = aux;
-    aux = aux->next;
-    free(aux1);
-  }
-}
-
 //erro a passar pointer
 void * client_server(void * arg){
 
   // get arguments
-  struct workerArgs *wa;
-  wa = (struct workerArgs*) arg;
-  int sock_fd = wa->sock;
+  int sock_fd = *(int*) arg;
 
   message_gw auxm;
   message m;
@@ -154,7 +30,7 @@ void * client_server(void * arg){
     //process message, process for server avalbility to do...
     if(auxm.type ==0){
       //case for no servers on list
-        find_server(&auxm);
+        find_server(head,&auxm);
     }
       //send answer for clients
       nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
@@ -168,9 +44,7 @@ void * client_server(void * arg){
 void * peers_server(void * arg){
 
   // get arguments
-  struct workerArgs *wa;
-  wa = (struct workerArgs*) arg;
-  int sock_fd = wa->sock;
+  int sock_fd = *(int*)arg;
 
   message_gw auxm;
   message m;
@@ -184,17 +58,17 @@ void * peers_server(void * arg){
 
     //process message, process for server avalbility to do...
     if(auxm.type ==1){
-      insert_server(auxm.address,auxm.port);
-      print_server_list();
+      insert_server(&head, auxm.address,auxm.port);
+      print_server_list(head);
     }else if(auxm.type == 3){
-      modifyavail_server(auxm.address, auxm.port, 0);
-      print_server_list();
+      modifyavail_server(head,auxm.address, auxm.port, 0);
+      print_server_list(head);
     }else if(auxm.type == 4){
-      modifyavail_server(auxm.address, auxm.port, 1);
-      print_server_list();
+      modifyavail_server(head,auxm.address, auxm.port, 1);
+      print_server_list(head);
     }else{
-      delete_server(auxm.address, auxm.port);
-      print_server_list();
+      delete_server(&head,auxm.address, auxm.port);
+      print_server_list(head);
     }
   }
   pthread_exit(NULL);
@@ -272,26 +146,15 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-    //erro a passar pointer, mas acho que tem que se mudar para shared variable a lista
-    struct workerArgs *wa;
-    //servernode* head = create_server_list();
-    wa = malloc(sizeof(struct workerArgs));
-    wa->sock = sock_fd;
-    //wa->list = head;
-
-    if(pthread_create(&thread_id, NULL, client_server,wa) != 0){
+    if(pthread_create(&thread_id, NULL, client_server,(void*) &sock_fd) != 0){
       perror("Could not create clients thread");
       close(sock_fd);
       close(sock_peers);
       exit(-1);
     }
 
-    struct workerArgs *wa1;
-    wa1 = malloc(sizeof(struct workerArgs));
-    wa1->sock = sock_peers;
-    //wa1->list = head;
 
-    if(pthread_create(&thread_id0, NULL, peers_server,wa1) != 0){
+    if(pthread_create(&thread_id0, NULL, peers_server,(void*) &sock_peers) != 0){
       perror("Could not create peers thread");
       close(sock_fd);
       close(sock_peers);
@@ -311,8 +174,6 @@ int main(int argc, char *argv[]){
           if(s != 0) perror("server thread cancel: ");
           s = pthread_cancel(thread_id);
           if(s != 0) perror("peers thread cancel: ");
-          free(wa);
-          free(wa1);
           clean_server_list(head);
           exit(0);
         }

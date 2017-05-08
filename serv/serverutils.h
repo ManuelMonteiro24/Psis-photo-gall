@@ -39,16 +39,15 @@ typedef struct keyword{
 }keyword;
 
 photo* create_photo_list();
-/*
-int add_photo(photo* head,char *name);
+
+int add_photo(photo** head,char *name);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword);
-int delete_photo(photo* head, uint32_t identifier);
+int delete_photo(photo** head, uint32_t identifier);
 int gallery_get_photo_name(photo* head, uint32_t id_photo,char **photo_name);
 int gallery_get_photo(photo* head, uint32_t id_photo);
 void print_list(photo * head);
 void gallery_clean_list(photo * head);
 void keyword_clean_list(keyword * head);
 void * handle_client(void * arg);
-*/
 #endif
