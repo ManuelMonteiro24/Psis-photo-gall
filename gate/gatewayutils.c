@@ -15,7 +15,7 @@ int insert_server(servernode **head, char* address, int port){
   strcpy(new_server->address, address);
   new_server->port = port;
   new_server->next = NULL;
-  new_server->available = 1;
+  new_server->available = 0;
 
   if(*head == NULL){
     *head = new_server;
@@ -60,7 +60,7 @@ int delete_server(servernode **head, char* address, int port){
   return(-1);
 }
 
-//-1 error 0->sucess
+//-1 error 0->sucess, type 0 -> add clients type 1-> remove clients
 int modifyavail_server(servernode *head, char* address, int port, int newstate){
 
   servernode *aux = head;
@@ -70,7 +70,11 @@ int modifyavail_server(servernode *head, char* address, int port, int newstate){
 
   while(aux !=NULL){
     if(strcmp(address, aux->address)==0 && port == aux->port){
-      aux->available = newstate;
+      if(newstate== 0){
+        aux->available++;
+      }else{
+        aux->available--;
+      }
       return(0);
     }
     aux = aux->next;
@@ -85,7 +89,7 @@ int find_server(servernode *head, message_gw* mssg){
   servernode *aux = head;
   int flagaux = 0;
   while(flagaux == 0 && aux != NULL){
-    if(aux->available ==1){
+    if(aux->available ==0){
       mssg->type = 0;
       strcpy(mssg->address,aux->address);
       mssg->port = aux->port;
@@ -115,7 +119,6 @@ void print_server_list(servernode *head){
 
 void clean_server_list(servernode *head){
   servernode * aux = head, *aux1 = head;
-
   while(aux != NULL){
     aux1 = aux;
     aux = aux->next;

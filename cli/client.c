@@ -30,6 +30,13 @@ int main(int argc, char *argv[]){
       exit(1);
     }
 
-    close(sock_fd);
-    exit(0);
+    //try to disconnect
+    while(1){
+      if(gallery_disconnect(sock_fd)==0){
+        close(sock_fd);
+        exit(0);
+      }else{
+        printf("Error disconnect\n");
+      }
+  }
 }

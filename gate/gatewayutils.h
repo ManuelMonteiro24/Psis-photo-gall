@@ -25,12 +25,8 @@ typedef struct servernode{
   int port;
   int available; //1 esta disponivel 0 nao esta disponivel
   struct servernode *next;
+  //pthread_mutex_t lock; for whatt''???'??'
 }servernode;
-
-typedef struct workerArgs{
-  int sock;
-  struct servernode *list;
-}workerArgs;
 
 servernode* create_server_list();
 

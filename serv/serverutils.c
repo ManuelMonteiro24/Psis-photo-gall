@@ -230,6 +230,7 @@ void * handle_client(void * arg){
   message_gw auxm;
   message m;
   int nbytes, sock_gt, newsockfd;
+  int endflag=0;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
 
@@ -252,43 +253,48 @@ void * handle_client(void * arg){
     pthread_exit(NULL);
   }
   //need to put this in loop to do...
+  while(endflag == 0){
+      // read message
+      nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
+      if( nbytes< 0){
+        perror("Read: ");
+        free(wa);
+        pthread_exit(NULL);
+      }
+      //process message
+      if(photo_aux.type == 0){
+        photo_aux.type = add_photo(&head, photo_aux.name);
+        print_list(head);
+      }else if(photo_aux.type ==1){
+        photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai no name
+        print_list(head);
+      }else if(photo_aux.type ==2){
+        //function to do...
+        //photo_aux.type = search_by_keyword(head);
+      }else if(photo_aux.type ==3){
+        photo_aux.type = delete_photo(&head, photo_aux.identifier);
+        print_list(head);
+      }else if(photo_aux.type ==4){
+        //function to do...
+        //photo_aux.type = gallery_get_photo_name();
+      }else if(photo_aux.type ==5){
+        photo_aux.type = gallery_get_photo(head,photo_aux.identifier);
+        print_list(head);
+      }else{
+        //disconnect client and close thread
+        endflag =1;
+        photo_aux.type = 10;
+      }
 
-    // read message
-    nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
+    //send answer (echo)
+    nbytes = send(newsockfd, &photo_aux, sizeof(photo_aux), 0);
     if( nbytes< 0){
-      perror("Read: ");
+      perror("Write: ");
       free(wa);
       pthread_exit(NULL);
     }
-    //process message
-    if(photo_aux.type == 0){
-      photo_aux.type = add_photo(&head, photo_aux.name);
-      print_list(head);
-    }else if(photo_aux.type ==1){
-      photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai no name
-      print_list(head);
-    }else if(photo_aux.type ==2){
-      //function to do...
-      //photo_aux.type = search_by_keyword(head);
-    }else if(photo_aux.type ==3){
-      photo_aux.type = delete_photo(&head, photo_aux.identifier);
-      print_list(head);
-    }else if(photo_aux.type ==4){
-      //function to do...
-      //photo_aux.type = gallery_get_photo_name();
-    }else{
-      photo_aux.type = gallery_get_photo(head,photo_aux.identifier);
-      print_list(head);
-    }
-
-  //send answer (echo)
-  nbytes = send(newsockfd, &photo_aux, sizeof(photo_aux), 0);
-  if( nbytes< 0){
-    perror("Write: ");
-    free(wa);
-    pthread_exit(NULL);
+    printf("replying %d bytes message:%s\n", nbytes, m.buffer);
   }
-  printf("replying %d bytes message:%s\n", nbytes, m.buffer);
 
   // communicate to gateway to change state
   auxm.type = 4;
@@ -300,13 +306,6 @@ void * handle_client(void * arg){
     free(wa);
     pthread_exit(NULL);
   }
-
-  //do this by reciving a signal to terminate to do...
-  auxm.type = 5;
-  strcpy(auxm.address, wa->address);
-  auxm.port = atoi(wa->port);
-  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
-  if( nbytes< 0) perror("Sending to gateway: ");
 
   printf("Exiting thread\n");
   gallery_clean_list(head);

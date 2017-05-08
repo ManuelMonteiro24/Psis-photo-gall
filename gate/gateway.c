@@ -164,20 +164,14 @@ int main(int argc, char *argv[]){
 
     while(1){
 
-      //best way to shut down the threads ????
+      //best way to shut down the threads ???? exit()=???
       //ctrl-c pressed!
         if(flag ==1){
-
           close(sock_fd);
           close(sock_peers);
-          int s = pthread_cancel(thread_id0);
-          if(s != 0) perror("server thread cancel: ");
-          s = pthread_cancel(thread_id);
-          if(s != 0) perror("peers thread cancel: ");
           clean_server_list(head);
           exit(0);
         }
-
     }
     // never goes here!
     return 0;

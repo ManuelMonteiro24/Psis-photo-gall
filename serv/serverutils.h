@@ -25,7 +25,7 @@ typedef struct workerArgs{
 }workerArgs;
 
 typedef struct photo{
-  int type; //0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
+  int type; //0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photon 10->disconnect
   uint32_t identifier;
   char name[20];
   struct keyword * key_header;

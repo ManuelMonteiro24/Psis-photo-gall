@@ -1,5 +1,36 @@
 #include "clientapi.h"
 
+//-1 -> error 0 -> sucess
+int gallery_disconnect(int peer_socket){
+
+  int nbytes;
+  struct photo photo_aux;
+
+  photo_aux.type = 10;
+
+  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
+  if(nbytes< 0){
+    perror("Write: ");
+    return(-1);
+  }
+  printf("sent %d message type:%d\n", nbytes, photo_aux.type);
+
+  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
+  if(nbytes< 0){
+    perror("Read: ");
+    return(-1);
+  }
+  printf("received %d message type:%d\n", nbytes, photo_aux.type);
+
+  if(photo_aux.type == 10){
+    close(peer_socket);
+    return(0);
+  }else{
+    //error
+    return(-1);
+  }
+}
+
 int gallery_connect(char * host, in_port_t port){
 
   message_gw auxm;
