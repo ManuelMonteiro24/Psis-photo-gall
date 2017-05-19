@@ -136,29 +136,69 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
   return(photo_aux.type);
 }
 
-int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
-  char buffer[BUFFERSIZE];
-  int nbytes;
+//TEST TO DO!
+int gallery_delete_photo(int peer_socket, uint32_t id_photo){
 
-  //send keyword and photoid to do...
-  strcpy(buffer, keyword);
-  nbytes = write(peer_socket,buffer, BUFFERSIZE);
+  message m;
+  int nbytes;
+  struct photo photo_aux;
+
+  photo_aux.type = 3;
+  photo_aux.identifier = id_photo;
+
+  /* send message to do... */
+  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
   if(nbytes< 0){
     perror("Write: ");
     return(-1);
   }
-  printf("sent %d %s\n", nbytes, buffer);
+  printf("sent %d %s\n", nbytes, m.buffer);
 
   /* receive confirmation to do... */
-  nbytes = read(peer_socket, buffer, nbytes);
+  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
   if(nbytes< 0){
     perror("Read: ");
     return(-1);
   }
-  printf("received %d bytes : %s", nbytes,  buffer);
+  printf("received %d bytes : %s", nbytes,  m.buffer);
 
-  //return sucess or no photo found
-  return(1);
+  // 1-> REmoval sucesssfull 0-> that photo isnt on the servers -1 -> error (duplicates)
+  return photo_aux.type;
+
+}
+
+//TEST TO DO!
+//return 1 if sucess, -1 if error, 0 if no photo found
+int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
+
+  message m;
+  int nbytes;
+  struct photo photo_aux;
+
+  photo_aux.type = 1;
+  photo_aux.identifier = id_photo;
+  //right now i am using name to pass it but we need to change it
+  strcpy(photo_aux.name, keyword);
+
+  /* send message to do... */
+  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
+  if(nbytes< 0){
+    perror("Write: ");
+    return(-1);
+  }
+  printf("sent %d %s\n", nbytes, m.buffer);
+
+  /* receive confirmation to do... */
+  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
+  if(nbytes< 0){
+    perror("Read: ");
+    return(-1);
+  }
+  printf("received %d bytes : %s", nbytes,  m.buffer);
+
+  // 1->Adding sucesssfull 0-> that photo isnt on the servers -1 -> error (duplicates or mem)
+  return photo_aux.type;
+
 }
 
 int gallery_search_photo(int peer_socket, char * keyword,
@@ -167,6 +207,7 @@ int gallery_search_photo(int peer_socket, char * keyword,
        char buffer[BUFFERSIZE];
        int nbytes;
 
+       /*
        //send keyword
        strcpy(buffer, keyword);
        nbytes = write(peer_socket,buffer, BUFFERSIZE);
@@ -176,7 +217,7 @@ int gallery_search_photo(int peer_socket, char * keyword,
        }
        printf("sent %d %s\n", nbytes, buffer);
 
-       /* receive photos identifier to do... */
+       // receive photos identifiers and photo count to do...
        nbytes = read(peer_socket, buffer, nbytes);
        if(nbytes< 0){
          perror("Read: ");
@@ -184,6 +225,30 @@ int gallery_search_photo(int peer_socket, char * keyword,
        }
        printf("received %d bytes : %s", nbytes,  buffer);
 
-       //return number of photos found to do...
-       return(1);
+       */
+
+       // after photos identifiers and photo count received TO DO...
+       int photos_found = 4;
+
+       //NO photos contain the provided keyword
+       if(photos_found == 0){
+         return 0;
+       }
+
+       //create output vector
+       *id_photos = (uint32_t*)calloc(photos_found, sizeof(uint32_t));
+       if(id_photos == NULL){
+         printf("Error creating id_photos vector\n");
+         return -1;
+       }
+
+       //insert photos_id in id_photos to do... ERROR HERE
+        /*for(int i=0; i<photos_found;i++){
+         *id_photos[1] = 0;
+         printf("%d", id_photos[i]);
+        }
+        */
+
+       //return number of photos found
+       return(photos_found);
 }

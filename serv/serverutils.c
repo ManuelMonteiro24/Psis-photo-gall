@@ -32,13 +32,13 @@ int add_photo(photo** head, char *name){
   return(photo_count);
 }
 
-// 1 -> error, 0 ->sucesssfull
+// -1 -> error, 0 ->no photo 1->sucess
 int add_keyword(photo* head, uint32_t identifier, char *keyword_input){
 
   //first search for photo
   if(head == NULL){
     printf("Empty list\n");
-    return(1);
+    return(0);
   }
   photo* aux = head;
 
@@ -51,7 +51,7 @@ int add_keyword(photo* head, uint32_t identifier, char *keyword_input){
       new_keyword = (keyword*)malloc(sizeof(keyword));
       if(new_keyword == NULL){
         printf("Error creating keyword\n");
-        return(1);
+        return(-1);
       }
       strcpy(new_keyword->name, keyword_input);
       new_keyword->next = NULL;
@@ -66,19 +66,19 @@ int add_keyword(photo* head, uint32_t identifier, char *keyword_input){
           if(strcmp(keyword_input, aux_keyword->name) == 0){
             printf("keyword already in photo\n");
             free(new_keyword);
-            return(1);
+            return(-1);
           }
           aux_keyword = aux_keyword->next;
         }
 
         aux_keyword->next = new_keyword;
       }
-      return(0);
+      return(1);
     }
     aux = aux->next;
   }
   printf("Photo not found!\n");
-  return(1);
+  return(0);
 }
 
 // -1 -> error, 0 ->no photos integer->number of photos count

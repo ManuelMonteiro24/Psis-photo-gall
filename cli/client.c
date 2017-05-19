@@ -5,6 +5,7 @@
 int main(int argc, char *argv[]){
 
     char buffer[BUFFERSIZE];
+    int ret_aux;
 
     if (argc < 3) {
        fprintf(stderr,"usage gatewayhostname gatewayport\n");
@@ -24,10 +25,58 @@ int main(int argc, char *argv[]){
     printf("Insert name of photo file to add to gallery: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
-    int photo_id = gallery_add_photo(sock_fd,buffer);
+    uint32_t photo_id = gallery_add_photo(sock_fd,buffer);
     if(photo_id == 0){
       fprintf(stderr,"Photo insertion as failed!\n");
       exit(1);
+    }
+
+    //gallery_add_keyword example
+
+    printf("Insert keyword to insert to the photo just inserted: \n");
+    fgets(buffer, BUFFERSIZE, stdin);
+
+    ret_aux =  gallery_add_keyword(sock_fd, photo_id, buffer);
+    if(ret_aux == -1){
+      fprintf(stderr,"Error duplicates or memory\n");
+      exit(1);
+    }else if(ret_aux == 0){
+      printf("Photo to add the keyword not found\n");
+    }else{
+      printf("Keyword adding sucesssfull\n");
+    }
+
+
+    //gallery_search_photo example
+
+    uint32_t *id_photos;
+
+    printf("Insert keyword to receive the photos_id with that tag: \n");
+    fgets(buffer, BUFFERSIZE, stdin);
+
+    int photo_count = gallery_search_photo(sock_fd, buffer, &id_photos);
+    if(photo_count == -1){
+      fprintf(stderr,"Error Ocurred (invalid arguments, network problem or memory problem)\n");
+      exit(1);
+    }else if(photo_count == 0){
+      printf("No photos in the servers with that keyword\n");
+    }else{
+      printf("Number of photos with that keyword: %d\n", photo_count);
+      printf("Photos identifiers: \n");
+
+      //print photo_id TO CHECK...
+      /*for(int i=0;i<photo_count;i++){
+        printf("%d \n", id_photos[i]);
+      }
+      */
+    }
+
+    //gallery_delete_photo example
+    ret_aux = gallery_delete_photo(sock_fd, photo_id);
+    if(ret_aux == 0){
+      printf("Photo to delete not found\n");
+    }else{
+      printf("Remove sucesssfull\n");
     }
 
     //try to disconnect

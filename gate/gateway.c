@@ -7,6 +7,11 @@ void my_handler(int sig){
 
 servernode* head = NULL;
 
+//only one mutex for all list now we only have problem in sync with the pointer
+//to head that can be changed inserting or deleting the first node
+//IS THIS THE BEST WAY??
+pthread_mutex_t mutex;
+
 //erro a passar pointer
 void * client_server(void * arg){
 
@@ -29,8 +34,9 @@ void * client_server(void * arg){
 
     //process message, process for server avalbility to do...
     if(auxm.type ==0){
-      //case for no servers on list
-        find_server(head,&auxm);
+      pthread_mutex_lock(&mutex);
+      find_server(head,&auxm);
+      pthread_mutex_unlock(&mutex);
     }
       //send answer for clients
       nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
@@ -57,6 +63,7 @@ void * peers_server(void * arg){
     printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
 
     //process message, process for server avalbility to do...
+    pthread_mutex_lock(&mutex);
     if(auxm.type ==1){
       insert_server(&head, auxm.address,auxm.port);
       print_server_list(head);
@@ -70,6 +77,7 @@ void * peers_server(void * arg){
       delete_server(&head,auxm.address, auxm.port);
       print_server_list(head);
     }
+    pthread_mutex_unlock(&mutex);
   }
   pthread_exit(NULL);
 }
@@ -146,6 +154,9 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
+    //Initiate mutex that protects list
+    pthread_mutex_init(&mutex, NULL);
+
     if(pthread_create(&thread_id, NULL, client_server,(void*) &sock_fd) != 0){
       perror("Could not create clients thread");
       close(sock_fd);
@@ -170,6 +181,7 @@ int main(int argc, char *argv[]){
           close(sock_fd);
           close(sock_peers);
           clean_server_list(head);
+          pthread_mutex_destroy(&mutex);
           exit(0);
         }
     }

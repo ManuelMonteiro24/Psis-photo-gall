@@ -87,9 +87,22 @@ int modifyavail_server(servernode *head, char* address, int port, int newstate){
 int find_server(servernode *head, message_gw* mssg){
   //get a server a give to client
   servernode *aux = head;
-  int flagaux = 0;
-  while(flagaux == 0 && aux != NULL){
-    if(aux->available ==0){
+  int lowOcupServer = 0;
+
+  // This form is hack change to a better one TO DO...
+  // Ideia change to circular linked list???
+  //search list for lower Ocup server
+  while(aux != NULL){
+    if(aux->available  < lowOcupServer){
+      lowOcupServer = aux-> available;
+    }
+    aux = aux->next;
+  }
+
+  aux = head;
+
+  while(aux != NULL){
+    if(aux->available  <= lowOcupServer){
       mssg->type = 0;
       strcpy(mssg->address,aux->address);
       mssg->port = aux->port;
@@ -97,6 +110,7 @@ int find_server(servernode *head, message_gw* mssg){
     }
     aux = aux->next;
   }
+
   //No server available
   mssg->type =2 ;
   strcpy(mssg->address,"");

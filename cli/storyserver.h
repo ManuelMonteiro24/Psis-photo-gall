@@ -14,6 +14,11 @@ typedef struct message_gw{
    int port;
 } message_gw;
 
+typedef struct keyword{
+  char name[20];
+  struct keyword *next;
+}keyword;
+
 typedef struct photo{
   int type; //0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
   uint32_t identifier;
