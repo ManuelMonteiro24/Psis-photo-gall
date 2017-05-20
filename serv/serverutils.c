@@ -15,6 +15,29 @@ int add_photo(photo** head, char *name){
     return(0);
   }
 
+  //generate file on disk to save photo data
+  char str[BUFFERSIZE];
+  char straux[BUFFERSIZE];
+  //ERROR ON FILE NAME???? WHY????
+  strcpy(str, name);
+  strcat(str, "_");
+  sprintf(straux, "%d", photo_count);
+  strcat(str, straux);
+  //need to aditionate one more strcat to ".png" ???? for photos
+
+  FILE *fptr;
+  fptr = fopen(str, "rb+");
+  if(fptr == NULL) //if file does not exist, create it, if it does let it be
+  {
+    fptr = fopen(str, "wb");
+    if(fptr == NULL){
+      perror("Photo file");
+      return(0);
+    }
+    //INSERT PHOTO DATA TO FILE TO DO...
+  }
+  fclose(fptr);
+
   new_photo->identifier = photo_count;
   strcpy(new_photo->name, name);
   new_photo->key_header = NULL;
@@ -138,7 +161,7 @@ int delete_photo(photo** head, uint32_t identifier){
 }
 
 // 0 ->no photo 1->sucesssfull
-int gallery_get_photo_name(photo* head, uint32_t id_photo,char **photo_name){
+int gallery_get_photo_name(photo* head, uint32_t id_photo, photo* photo_aux){
 
   if(head==NULL){
     printf("Empty list\n");
@@ -149,7 +172,7 @@ int gallery_get_photo_name(photo* head, uint32_t id_photo,char **photo_name){
 
   while(aux!= NULL){
     if(aux->identifier== id_photo){
-      //get photo name to photo_name var to return
+      strcpy(photo_aux->name,aux->name);
       return(1);
     }
   aux = aux->next;
@@ -159,7 +182,7 @@ int gallery_get_photo_name(photo* head, uint32_t id_photo,char **photo_name){
 
 // 0 ->no photo 1->sucesssfull, change return or parameters to send photo data to do...
 //talvez o melhor seja receber a socket e enviar dentro da func
-int gallery_get_photo(photo* head,uint32_t id_photo){
+int gallery_get_photo(photo* head,uint32_t id_photo, photo* photo_aux){
 
   if(head==NULL){
     printf("Empty list\n");
@@ -170,7 +193,7 @@ int gallery_get_photo(photo* head,uint32_t id_photo){
 
   while(aux!=NULL){
     if(aux->identifier== id_photo){
-      //get photo data and sent to client
+      strcpy(photo_aux->name,aux->name);   //exemplo to modify TO DO
       return(1);
     }
     aux = aux->next;
@@ -229,7 +252,6 @@ void * handle_client(void * arg){
   wa = (struct workerArgs*) arg;
 
   message_gw auxm;
-  message m;
   int nbytes, sock_gt, newsockfd;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
@@ -274,10 +296,9 @@ void * handle_client(void * arg){
         photo_aux.type = delete_photo(&head, photo_aux.identifier);
         print_list(head);
       }else if(photo_aux.type ==4){
-        //function to do...
-        //photo_aux.type = gallery_get_photo_name();
+        photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
       }else if(photo_aux.type ==5){
-        photo_aux.type = gallery_get_photo(head,photo_aux.identifier);
+        photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
         print_list(head);
       }else if(photo_aux.type == -1){
         //ERROR ON EXIT TO RESOLVE
@@ -315,7 +336,7 @@ void * handle_client(void * arg){
     free(wa);
     pthread_exit(NULL);
   }
-  printf("replying %d bytes message:%s\n", nbytes, m.buffer);
+  printf("replying %d bytes message:%d\n", nbytes, photo_aux.type);
 
   printf("Exiting thread\n");
   gallery_clean_list(head);

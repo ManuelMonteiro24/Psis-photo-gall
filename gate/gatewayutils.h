@@ -1,7 +1,6 @@
 #ifndef GATEWAYUTILS
 #define GATEWAYUTILS
 
-#include "storyserver.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -27,6 +26,13 @@ typedef struct servernode{
   struct servernode *next;
   //pthread_mutex_t lock; for whatt''???'??'
 }servernode;
+
+//serialize data to do....
+typedef struct message_gw{
+   int type;
+   char address[20];
+   int port;
+} message_gw;
 
 servernode* create_server_list();
 

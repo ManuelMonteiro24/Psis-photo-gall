@@ -19,7 +19,6 @@ void * client_server(void * arg){
   int sock_fd = *(int*) arg;
 
   message_gw auxm;
-  message m;
   struct sockaddr_in client_addr;
   servernode *auxpointer = NULL;
   socklen_t size_addr;
@@ -53,7 +52,6 @@ void * peers_server(void * arg){
   int sock_fd = *(int*)arg;
 
   message_gw auxm;
-  message m;
   int nbytes;
 
   while(1){
@@ -94,7 +92,6 @@ int main(int argc, char *argv[]){
     }
 
     //var for sockets
-    message m;
     message_gw auxm;
     struct sockaddr_in local_addr, local_addr0;
     struct sockaddr_in client_addr;

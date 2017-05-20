@@ -12,7 +12,29 @@
 #include <errno.h>
 #include <netdb.h>
 #include <arpa/inet.h>
-#include "storyserver.h"
+
+//serialize data to do....
+#pragma pack(1)
+typedef struct message_gw{
+   int type;
+   char address[20];
+   int port;
+} message_gw;
+
+typedef struct keyword{
+  char name[20];
+  struct keyword *next;
+}keyword;
+
+typedef struct photo{
+  int type; //-1-> disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
+  uint32_t identifier;
+  char name[20];
+  struct keyword * key_header;
+  //falta binary data
+  struct photo *next;
+}photo;
+
 
 int gallery_connect(char * host, in_port_t port);
 uint32_t gallery_add_photo(int peer_socket, char *file_name);

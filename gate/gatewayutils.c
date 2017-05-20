@@ -22,10 +22,13 @@ int insert_server(servernode **head, char* address, int port){
   }
 
   servernode* aux = *head;
+  //1 server in the list case
+  if(aux->port == port && strcmp(aux->address,address) == 0)
+    return(-1);
+
   while( aux->next != NULL){
-    if(aux->port == port && strcmp(aux->address,address) == 0){
+    if(aux->port == port && strcmp(aux->address,address) == 0)
       return(-1);
-    }
     aux = aux->next;
   }
   aux->next = new_server;

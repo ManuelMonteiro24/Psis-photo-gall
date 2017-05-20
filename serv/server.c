@@ -18,7 +18,7 @@ int main(int argc, char *argv[]){
     }
 
     //var for sockets
-    message m;
+    char buffer[BUFFERSIZE];
     message_gw auxm;
     struct sockaddr_in local_addr;
     struct sockaddr_in client_addr;
