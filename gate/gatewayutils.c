@@ -2,7 +2,6 @@
 
 
 //-1-> error 0->sucess
-//de momento esta a permitir duplicados change to do,..
 //insert at the end of the list
 int insert_server(servernode **head, char* address, int port){
 
@@ -24,6 +23,9 @@ int insert_server(servernode **head, char* address, int port){
 
   servernode* aux = *head;
   while( aux->next != NULL){
+    if(aux->port == port && strcmp(aux->address,address) == 0){
+      return(-1);
+    }
     aux = aux->next;
   }
   aux->next = new_server;

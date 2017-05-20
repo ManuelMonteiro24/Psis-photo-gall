@@ -3,15 +3,11 @@
 //insert at the end of the list, 0-> error, integer ->sucesssfull
 int add_photo(photo** head, char *name){
 
-  int photo_count = 1;
-  photo* aux = *head;
+  //generate random number for photo identifier
+  srand(time(NULL)*pthread_self());
+  int random_number = rand() %501;
+  int photo_count = (pthread_self()*random_number)/(time(NULL)*random_number);
 
-  if(*head != NULL){
-    while(aux != NULL){
-      aux = aux->next;
-      photo_count++;
-    }
-  }
   photo* new_photo;
   new_photo = (photo*)malloc(sizeof(photo));
   if(new_photo == NULL){
@@ -24,10 +20,15 @@ int add_photo(photo** head, char *name){
   new_photo->key_header = NULL;
   new_photo-> next = NULL;
 
-  if(photo_count==1)
+  photo* aux = *head;
+  if(*head == NULL){
     *head = new_photo;
-  else
+  }else{
+    while(aux != NULL){
+      aux = aux->next;
+    }
     aux->next = new_photo;
+  }
 
   return(photo_count);
 }
@@ -230,13 +231,11 @@ void * handle_client(void * arg){
   message_gw auxm;
   message m;
   int nbytes, sock_gt, newsockfd;
-  int endflag=0;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
 
   struct photo photo_aux;
 
-  //necessario?
   pthread_detach(pthread_self());
 
   //create list
@@ -253,7 +252,7 @@ void * handle_client(void * arg){
     pthread_exit(NULL);
   }
   //need to put this in loop to do...
-  while(endflag == 0){
+  while(1){
       // read message
       nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
       if( nbytes< 0){
@@ -263,10 +262,10 @@ void * handle_client(void * arg){
       }
       //process message
       if(photo_aux.type == 0){
-        photo_aux.type = add_photo(&head, photo_aux.name);
+        photo_aux.identifier = add_photo(&head, photo_aux.name);
         print_list(head);
       }else if(photo_aux.type ==1){
-        photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai no name
+        photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
         print_list(head);
       }else if(photo_aux.type ==2){
         //function to do...
@@ -280,20 +279,22 @@ void * handle_client(void * arg){
       }else if(photo_aux.type ==5){
         photo_aux.type = gallery_get_photo(head,photo_aux.identifier);
         print_list(head);
-      }else{
+      }else if(photo_aux.type == -1){
+        //ERROR ON EXIT TO RESOLVE
         //disconnect client and close thread
-        endflag =1;
-        photo_aux.type = 10;
+        break;
+      }else{
+        //TO DO
       }
 
     //send answer (echo)
-    nbytes = send(newsockfd, &photo_aux, sizeof(photo_aux), 0);
+    nbytes = write(newsockfd, &photo_aux, sizeof(photo));
     if( nbytes< 0){
       perror("Write: ");
       free(wa);
       pthread_exit(NULL);
     }
-    printf("replying %d bytes message:%s\n", nbytes, m.buffer);
+    printf("replying %d bytes message type:%d\n", nbytes, photo_aux.type);
   }
 
   // communicate to gateway to change state
@@ -306,6 +307,15 @@ void * handle_client(void * arg){
     free(wa);
     pthread_exit(NULL);
   }
+
+  //Confirmate disconnection to client
+  nbytes = write(newsockfd, &photo_aux, sizeof(photo));
+  if( nbytes< 0){
+    perror("Write: ");
+    free(wa);
+    pthread_exit(NULL);
+  }
+  printf("replying %d bytes message:%s\n", nbytes, m.buffer);
 
   printf("Exiting thread\n");
   gallery_clean_list(head);

@@ -6,7 +6,7 @@ int gallery_disconnect(int peer_socket){
   int nbytes;
   struct photo photo_aux;
 
-  photo_aux.type = 10;
+  photo_aux.type = -1;
 
   nbytes = write(peer_socket, &photo_aux, sizeof(photo));
   if(nbytes< 0){
@@ -22,7 +22,7 @@ int gallery_disconnect(int peer_socket){
   }
   printf("received %d message type:%d\n", nbytes, photo_aux.type);
 
-  if(photo_aux.type == 10){
+  if(photo_aux.type == -1){
     close(peer_socket);
     return(0);
   }else{
@@ -130,13 +130,13 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
     perror("Read: ");
     return(0);
   }
-  printf("received %d bytes : %s", nbytes,  m.buffer);
+  printf("received %d bytes : %s \n", nbytes,  m.buffer);
 
   //return photo idetifier to do...
-  return(photo_aux.type);
+  return(photo_aux.identifier);
 }
 
-//TEST TO DO!
+
 int gallery_delete_photo(int peer_socket, uint32_t id_photo){
 
   message m;
@@ -160,7 +160,7 @@ int gallery_delete_photo(int peer_socket, uint32_t id_photo){
     perror("Read: ");
     return(-1);
   }
-  printf("received %d bytes : %s", nbytes,  m.buffer);
+  printf("received %d bytes : %s \n", nbytes,  m.buffer);
 
   // 1-> REmoval sucesssfull 0-> that photo isnt on the servers -1 -> error (duplicates)
   return photo_aux.type;
@@ -194,7 +194,10 @@ int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
     perror("Read: ");
     return(-1);
   }
-  printf("received %d bytes : %s", nbytes,  m.buffer);
+
+  //ERROR HERE NOT RECVING 1 FROM server, the client is reciving 0 instead
+
+  printf("received %d bytes message type: %d\n", nbytes,  photo_aux.type);
 
   // 1->Adding sucesssfull 0-> that photo isnt on the servers -1 -> error (duplicates or mem)
   return photo_aux.type;

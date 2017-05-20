@@ -81,6 +81,8 @@ int main(int argc, char *argv[]){
 
     //try to disconnect
     while(1){
+
+      //client doesnt leave rigth away dunno why?
       if(gallery_disconnect(sock_fd)==0){
         close(sock_fd);
         exit(0);
