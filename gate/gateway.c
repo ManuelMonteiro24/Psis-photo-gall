@@ -51,20 +51,55 @@ void * peers_server(void * arg){
   // get arguments
   int sock_fd = *(int*)arg;
 
-  message_gw auxm;
-  int nbytes;
+
+  struct sockaddr_in peer_addr;
+  socklen_t size_addr;
+
+  message_gw auxm, auxm2;
+  int nbytes, port_aux, ret_aux;
+  char address_aux[20];
 
   while(1){
     //read
-    nbytes = recv(sock_fd,&auxm,sizeof(struct message_gw),0);
+    size_addr = sizeof(struct sockaddr_in);
+    nbytes = recvfrom(sock_fd,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & peer_addr, &size_addr);
     if( nbytes< 0) perror("Read: ");
     printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
 
     //process message, process for server avalbility to do...
     pthread_mutex_lock(&mutex);
     if(auxm.type ==1){
-      insert_server(&head, auxm.address,auxm.port);
+      //ADDRESS and port from the peer that just register
+      strcpy(address_aux,auxm.address);
+      port_aux = auxm.port;
+
+      //auxm recv server after the register peer and auxm2 recv server before the register peer
+      ret_aux = insert_server(&head, auxm.address,auxm.port, &auxm, &auxm2);
+
       print_server_list(head);
+      //send answer back to the server that just register
+      nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, (const struct sockaddr *) &peer_addr, sizeof(peer_addr));
+      if( nbytes< 0) perror("Write: ");
+      printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
+
+       if(ret_aux == 1){
+        //if already is a server register
+        //send answer back to the server that is going to update the server that just register
+
+        auxm.type = 0;
+        strcpy(auxm.address, address_aux);
+        auxm.port = port_aux;
+
+        //contact with gateway
+        bzero((char *) &peer_addr, sizeof(peer_addr));
+        peer_addr.sin_family = AF_INET;
+        peer_addr.sin_addr.s_addr = inet_addr(auxm2.address);
+        peer_addr.sin_port = htons(auxm2.port);
+
+        nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
+        if( nbytes< 0) perror("Write: ");
+         printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
+       }
     }else if(auxm.type == 3){
       modifyavail_server(head,auxm.address, auxm.port, 0);
       print_server_list(head);
@@ -72,7 +107,19 @@ void * peers_server(void * arg){
       modifyavail_server(head,auxm.address, auxm.port, 1);
       print_server_list(head);
     }else{
-      delete_server(&head,auxm.address, auxm.port);
+      //auxm receives the next of the deleted and auxm2 the peer behind it
+      if(delete_server(&head,auxm.address, auxm.port, &auxm, &auxm2)== 1){
+
+        //contact with gateway
+        bzero((char *) &peer_addr, sizeof(peer_addr));
+        peer_addr.sin_family = AF_INET;
+        peer_addr.sin_addr.s_addr = inet_addr(auxm2.address);
+        peer_addr.sin_port = htons(auxm2.port);
+
+        nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
+        if( nbytes< 0) perror("Write: ");
+         printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
+      }
       print_server_list(head);
     }
     pthread_mutex_unlock(&mutex);

@@ -29,7 +29,7 @@ typedef struct servernode{
 
 //serialize data to do....
 typedef struct message_gw{
-   int type;
+   int type; //0->next peer
    char address[20];
    int port;
 } message_gw;
@@ -37,9 +37,9 @@ typedef struct message_gw{
 servernode* create_server_list();
 
 
-int insert_server(servernode **head,char* address, int port);
+int insert_server(servernode **head,char* address, int port, message_gw *auxm, message_gw *auxm2);
 
-int delete_server(servernode **head,char* address, int port);
+int delete_server(servernode **head,char* address, int port, message_gw *auxm, message_gw *auxm2);
 
 int modifyavail_server(servernode *head,char* address, int port, int newstate);
 

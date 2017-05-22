@@ -1,9 +1,9 @@
 #include "gatewayutils.h"
 
 
-//-1-> error 0->sucess
+//-1-> error 0->sucess, first peer to register 1-> sucess more than 1 peer register
 //insert at the end of the list
-int insert_server(servernode **head, char* address, int port){
+int insert_server(servernode **head, char* address, int port, message_gw *auxm, message_gw *auxm2){
 
   servernode *new_server = (servernode*) malloc(sizeof(servernode));
   if(new_server == NULL){
@@ -18,10 +18,13 @@ int insert_server(servernode **head, char* address, int port){
 
   if(*head == NULL){
     *head = new_server;
+    auxm->type = 0;
+    auxm->port = 0; //means that doesnt have next peer
     return(0);
   }
 
   servernode* aux = *head;
+  servernode* aux2 = *head;
   //1 server in the list case
   if(aux->port == port && strcmp(aux->address,address) == 0)
     return(-1);
@@ -29,14 +32,24 @@ int insert_server(servernode **head, char* address, int port){
   while( aux->next != NULL){
     if(aux->port == port && strcmp(aux->address,address) == 0)
       return(-1);
+    aux2 = aux;
     aux = aux->next;
   }
   aux->next = new_server;
-  return(0);
+  //the next peer of the inserted one is the first of the list
+  auxm->type = 0;
+  strcpy(auxm->address, (*head)->address);
+  auxm->port = (*head)->port;
+
+  //information of the peer before of the inserted
+  auxm2->type = 0;
+  strcpy(auxm2->address, aux2->address);
+  auxm2->port = aux2->port;
+  return(1);
 }
 
-//-1->error 0-> sucesssfull delete
-int delete_server(servernode **head, char* address, int port){
+//-1->error 0-> sucesssfull delete 1-> two or more peers on the list
+int delete_server(servernode **head, char* address, int port, message_gw *auxm, message_gw *auxm2){
 
   servernode *aux = *head;
   servernode *aux0= *head;
@@ -50,12 +63,22 @@ int delete_server(servernode **head, char* address, int port){
     return(0);
   }
 
-
   while(aux !=NULL){
     if((strcmp(address, aux->address)==0) && (port == aux->port)){
       //server found
       aux0->next = aux->next;
-      return(0);
+
+      //auxm
+      auxm->type = 0;
+      aux = aux->next;
+      strcpy(auxm->address,aux->address);
+      auxm->port = aux->port;
+
+      //auxm2
+      auxm2->type = 0;
+      strcpy(auxm2->address,aux0->address);
+      auxm2->port = aux0->port;
+      return(2);
     }
     aux0 = aux;
     aux= aux->next;
@@ -88,7 +111,7 @@ int modifyavail_server(servernode *head, char* address, int port, int newstate){
   return(-1);
 }
 
-//-1 error 0->sucess
+//-1 -> error 0->sucess
 int find_server(servernode *head, message_gw* mssg){
 
   //get a server a give to client

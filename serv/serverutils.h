@@ -22,7 +22,6 @@
 typedef struct workerArgs{
   int gatesock;
   int clisock;
-  struct sockaddr_in gateway_addr;
   char address[20], port[20];
 }workerArgs;
 

@@ -6,14 +6,54 @@ void my_handler(int sig){
   flag = 1;
 }
 
+//gateway_addr shared by all threads
+struct sockaddr_in gateway_addr;
+
+//Next peer scheme vars
+struct sockaddr_in next_peer_addr;
+socklen_t size_addr;
+
+//NOT USING RIGTH NOW!
+pthread_mutex_t next_peer_lock;
+
 //Peer photo list thats going to be shared between the threads
 photo* head = NULL;
+
 // NOT THE OPTIMAL WAY TO SYNC BUT FOR NOW workerArgs
 // CHANGE TO a mutex lock in each struct of the list TO DO..
 pthread_mutex_t mutex;
 
 void * peers_sync(void * arg){
-  return 0;
+
+
+
+  int sock_gt = *(int*) arg;
+
+  message_gw auxm;
+
+  int nbytes;
+
+  while(1){
+
+    //NOT WORKING AND WE SHOULD DISCUSS HOW WE GOING TO DO THIS, we bind a udp server for each peer???
+
+    nbytes = recv(sock_gt, &auxm, sizeof( struct message_gw),0);
+    if( nbytes< 0) perror("Receiving from gateway: ");
+    printf("received %d with address %s and port %d\n", nbytes , auxm.address, auxm.port);
+
+    //TO DO...
+    //trough this thread make the heartbeating connection to the gateway
+    //to check when if it is online
+    //through here made a send to another peer of all those threads that we doesnt have
+    //when he regists
+    //RCV PHOTOS OR PHOTO TO ADD UPLOAD OR DELETE FROM ANOTHER PEER
+
+    if(auxm.type == 0){
+      next_peer_addr.sin_addr.s_addr = inet_addr(auxm.address);
+      next_peer_addr.sin_port = htons(auxm.port);
+    }
+  }
+  //never goes here
 }
 
 void * handle_client(void * arg){
@@ -35,13 +75,13 @@ void * handle_client(void * arg){
   auxm.type = 3;
   strcpy(auxm.address, wa->address);
   auxm.port = atoi(wa->port);
-  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
+  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
   if(nbytes< 0){
     perror("Sending to gateway: ");
     free(wa);
     pthread_exit(NULL);
   }
-  //need to put this in loop to do...
+
   while(1){
       // read message
       nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
@@ -51,34 +91,37 @@ void * handle_client(void * arg){
         pthread_exit(NULL);
       }
 
+      //printf("NEXT PEER: address %s port %d\n", pee );
+
       //process message
       pthread_mutex_lock(&mutex);
       if(photo_aux.type == 0){
         photo_aux.identifier = add_photo(&head, photo_aux.name);
         print_list(head);
+        //SEND PHOTO TO THE NEXT PEER TO DO...
       }else if(photo_aux.type ==1){
         photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
         print_list(head);
+        //SEND UPDATE TO THE NEXT PEER TO DO...
       }else if(photo_aux.type ==2){
         //function to do...
         //photo_aux.type = search_by_keyword(head);
       }else if(photo_aux.type ==3){
         photo_aux.type = delete_photo(&head, photo_aux.identifier);
         print_list(head);
+        //SEND UPDATE TO THE NEXT PEER TO DO...
       }else if(photo_aux.type ==4){
         photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
       }else if(photo_aux.type ==5){
         photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
         print_list(head);
-      }else if(photo_aux.type == -1){
+      }else{
         //ERROR ON EXIT TO RESOLVE
         //disconnect client and close thread
         break;
-      }else{
-        //TO DO
       }
-      pthread_mutex_unlock(&mutex);
 
+      pthread_mutex_unlock(&mutex);
 
     //send answer (echo)
     nbytes = write(newsockfd, &photo_aux, sizeof(photo));
@@ -94,7 +137,7 @@ void * handle_client(void * arg){
   auxm.type = 4;
   strcpy(auxm.address, wa->address);
   auxm.port = atoi(wa->port);
-  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
+  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
   if( nbytes< 0){
     perror("Sending to gateway: ");
     free(wa);
@@ -181,7 +224,7 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-    //process message to gateway
+    //process message to gateway (register)
     auxm.type = 1;
     strcpy(auxm.address, argv[1]);
     auxm.port = atoi(argv[2]);
@@ -190,12 +233,26 @@ int main(int argc, char *argv[]){
     nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
     if( nbytes< 0) perror("Sending to gateway: ");
 
+    nbytes = recv(sock_gt, &auxm, sizeof( struct message_gw),0);
+    if( nbytes< 0) perror("Receiving from gateway: ");
+    printf("received %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
+
+    //SET NEXT PEER if it isnt peer online
+    if(auxm.port != 0){
+      bzero((char *) &next_peer_addr, sizeof(next_peer_addr));
+      next_peer_addr.sin_family = AF_INET;
+      next_peer_addr.sin_addr.s_addr = inet_addr(auxm.address);
+      next_peer_addr.sin_port = htons(auxm.port);
+    }
+    pthread_mutex_init(&next_peer_lock, NULL);
+
     //Peers sync thread
     if(pthread_create(&sync_thread, NULL, peers_sync, &sock_gt) != 0){
       perror("Could not create thread");
       close(newsockfd);
       close(sock_gt);
       close(sock_fd);
+      pthread_mutex_destroy(&next_peer_lock);
       exit(-1);
     }
 
@@ -220,6 +277,8 @@ int main(int argc, char *argv[]){
             auxm.port = atoi(wa->port);
             nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
             if( nbytes< 0) perror("Sending to gateway: ");
+            pthread_mutex_destroy(&mutex);
+            pthread_mutex_destroy(&next_peer_lock);
             close(sock_gt);
             close(sock_fd);
             exit(0);
@@ -228,7 +287,6 @@ int main(int argc, char *argv[]){
           wa = malloc(sizeof(struct workerArgs));
           wa->gatesock = sock_gt;
           wa->clisock = newsockfd;
-          wa->gateway_addr = gateway_addr;
           strcpy(wa->address, argv[1]);
           strcpy(wa->port, argv[2]);
 
