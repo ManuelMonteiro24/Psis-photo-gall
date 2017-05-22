@@ -90,9 +90,16 @@ int modifyavail_server(servernode *head, char* address, int port, int newstate){
 
 //-1 error 0->sucess
 int find_server(servernode *head, message_gw* mssg){
+
   //get a server a give to client
+
+  if(head == NULL){
+    printf("Empty list\n");
+    return(-1);
+  }
+
   servernode *aux = head;
-  int lowOcupServer = 0;
+  int lowOcupServer = aux->available;
 
   // This form is hack change to a better one TO DO...
   // Ideia change to circular linked list???

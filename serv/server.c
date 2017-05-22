@@ -6,6 +6,116 @@ void my_handler(int sig){
   flag = 1;
 }
 
+//Peer photo list thats going to be shared between the threads
+photo* head = NULL;
+// NOT THE OPTIMAL WAY TO SYNC BUT FOR NOW workerArgs
+// CHANGE TO a mutex lock in each struct of the list TO DO..
+pthread_mutex_t mutex;
+
+void * peers_sync(void * arg){
+  return 0;
+}
+
+void * handle_client(void * arg){
+
+  // get arguments
+  struct workerArgs *wa;
+  wa = (struct workerArgs*) arg;
+
+  message_gw auxm;
+  int nbytes, sock_gt, newsockfd;
+  sock_gt = wa->gatesock;
+  newsockfd = wa->clisock;
+
+  struct photo photo_aux;
+
+  pthread_detach(pthread_self());
+
+  //if accept was sucesssfull communicate to gateway to change state
+  auxm.type = 3;
+  strcpy(auxm.address, wa->address);
+  auxm.port = atoi(wa->port);
+  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
+  if(nbytes< 0){
+    perror("Sending to gateway: ");
+    free(wa);
+    pthread_exit(NULL);
+  }
+  //need to put this in loop to do...
+  while(1){
+      // read message
+      nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
+      if( nbytes< 0){
+        perror("Read: ");
+        free(wa);
+        pthread_exit(NULL);
+      }
+
+      //process message
+      pthread_mutex_lock(&mutex);
+      if(photo_aux.type == 0){
+        photo_aux.identifier = add_photo(&head, photo_aux.name);
+        print_list(head);
+      }else if(photo_aux.type ==1){
+        photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
+        print_list(head);
+      }else if(photo_aux.type ==2){
+        //function to do...
+        //photo_aux.type = search_by_keyword(head);
+      }else if(photo_aux.type ==3){
+        photo_aux.type = delete_photo(&head, photo_aux.identifier);
+        print_list(head);
+      }else if(photo_aux.type ==4){
+        photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
+      }else if(photo_aux.type ==5){
+        photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
+        print_list(head);
+      }else if(photo_aux.type == -1){
+        //ERROR ON EXIT TO RESOLVE
+        //disconnect client and close thread
+        break;
+      }else{
+        //TO DO
+      }
+      pthread_mutex_unlock(&mutex);
+
+
+    //send answer (echo)
+    nbytes = write(newsockfd, &photo_aux, sizeof(photo));
+    if( nbytes< 0){
+      perror("Write: ");
+      free(wa);
+      pthread_exit(NULL);
+    }
+    printf("replying %d bytes message type:%d\n", nbytes, photo_aux.type);
+  }
+
+  // communicate to gateway to change state
+  auxm.type = 4;
+  strcpy(auxm.address, wa->address);
+  auxm.port = atoi(wa->port);
+  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
+  if( nbytes< 0){
+    perror("Sending to gateway: ");
+    free(wa);
+    pthread_exit(NULL);
+  }
+
+  //Confirmate disconnection to client
+  nbytes = write(newsockfd, &photo_aux, sizeof(photo));
+  if( nbytes< 0){
+    perror("Write: ");
+    free(wa);
+    pthread_exit(NULL);
+  }
+  printf("replying %d bytes message:%d\n", nbytes, photo_aux.type);
+
+  printf("Exiting thread\n");
+  gallery_clean_list(head);
+  free(wa);
+  pthread_exit(NULL);
+}
+
 int main(int argc, char *argv[]){
 
     //signals
@@ -26,7 +136,7 @@ int main(int argc, char *argv[]){
     socklen_t size_addr;
 
     //var for threads
-    pthread_t thread_id;
+    pthread_t thread_id, sync_thread;
     struct workerArgs *wa;
 
     int nbytes, clilen, newsockfd, portno;
@@ -79,6 +189,18 @@ int main(int argc, char *argv[]){
     //send checkin message to gateway
     nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
     if( nbytes< 0) perror("Sending to gateway: ");
+
+    //Peers sync thread
+    if(pthread_create(&sync_thread, NULL, peers_sync, &sock_gt) != 0){
+      perror("Could not create thread");
+      close(newsockfd);
+      close(sock_gt);
+      close(sock_fd);
+      exit(-1);
+    }
+
+    //Initiate mutex that protects list
+    pthread_mutex_init(&mutex, NULL);
 
     listen(sock_fd,5);
     clilen = sizeof(client_addr);

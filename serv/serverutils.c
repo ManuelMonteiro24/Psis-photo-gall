@@ -4,9 +4,29 @@
 int add_photo(photo** head, char *name){
 
   //generate random number for photo identifier
+  int aux_flag = 0;
+  photo* aux = *head;
+
   srand(time(NULL)*pthread_self());
-  int random_number = rand() %501;
-  int photo_count = (pthread_self()*random_number)/(time(NULL)*random_number);
+  int random_number, photo_count;
+
+  while(1){
+    random_number = rand() %501;
+    photo_count = (pthread_self()*random_number)/(time(NULL)*random_number*random_number);
+    //Check if identifier already is in use
+    if(aux == NULL)
+      break;
+
+    while(aux !=NULL){
+      if(aux->identifier == photo_count){
+        aux_flag = 1;
+        break;
+      }
+      aux = aux->next;
+    }
+    if(aux_flag == 0)
+      break;
+  }
 
   photo* new_photo;
   new_photo = (photo*)malloc(sizeof(photo));
@@ -18,9 +38,8 @@ int add_photo(photo** head, char *name){
   //generate file on disk to save photo data
   char str[BUFFERSIZE];
   char straux[BUFFERSIZE];
-  //ERROR ON FILE NAME???? WHY????
+  name[strlen(name) - 1] = 0;
   strcpy(str, name);
-  strcat(str, "_");
   sprintf(straux, "%d", photo_count);
   strcat(str, straux);
   //need to aditionate one more strcat to ".png" ???? for photos
@@ -43,14 +62,19 @@ int add_photo(photo** head, char *name){
   new_photo->key_header = NULL;
   new_photo-> next = NULL;
 
-  photo* aux = *head;
+  aux = *head;
   if(*head == NULL){
     *head = new_photo;
   }else{
-    while(aux != NULL){
-      aux = aux->next;
+    //1 server on list
+    if(aux->next == NULL){
+      aux->next = new_photo;
+    }else{
+      while(aux->next != NULL){
+        aux = aux->next;
+      }
+      aux->next = new_photo;
     }
-    aux->next = new_photo;
   }
 
   return(photo_count);
@@ -108,7 +132,7 @@ int add_keyword(photo* head, uint32_t identifier, char *keyword_input){
 // -1 -> error, 0 ->no photos integer->number of photos count
 int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword_input){
 
-  //create id_photos to do..??
+  //create id_photos to send to do..??
 
   if(head == NULL){
     printf("Empty list\n");
@@ -209,10 +233,12 @@ void print_list(photo* head){
     printf("Empty list!\n");
     return;
   }
+
+  printf("photo list: ");
   photo* aux = head;
   keyword *aux2 = NULL;
   while (aux!=NULL) {
-    printf("photo list: iden-> %d name-> %s keyword's:",aux->identifier,aux->name);
+    printf("iden-> %d name-> %s keyword's:",aux->identifier,aux->name);
     aux2 = aux->key_header;
     if(aux2 != NULL){
       while(aux2 != NULL){
@@ -220,10 +246,9 @@ void print_list(photo* head){
         aux2=aux2->next;
       }
     }
+    printf("\n");
     aux = aux->next;
   }
-  printf("\n");
-
 }
 
 void keyword_clean_list(keyword * head){
@@ -243,103 +268,4 @@ void gallery_clean_list(photo* head){
     keyword_clean_list(aux1->key_header);
     free(aux1);
   }
-}
-
-void * handle_client(void * arg){
-
-  // get arguments
-  struct workerArgs *wa;
-  wa = (struct workerArgs*) arg;
-
-  message_gw auxm;
-  int nbytes, sock_gt, newsockfd;
-  sock_gt = wa->gatesock;
-  newsockfd = wa->clisock;
-
-  struct photo photo_aux;
-
-  pthread_detach(pthread_self());
-
-  //create list
-  photo* head = NULL;
-
-  //if accept was sucesssfull communicate to gateway to change state
-  auxm.type = 3;
-  strcpy(auxm.address, wa->address);
-  auxm.port = atoi(wa->port);
-  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
-  if(nbytes< 0){
-    perror("Sending to gateway: ");
-    free(wa);
-    pthread_exit(NULL);
-  }
-  //need to put this in loop to do...
-  while(1){
-      // read message
-      nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
-      if( nbytes< 0){
-        perror("Read: ");
-        free(wa);
-        pthread_exit(NULL);
-      }
-      //process message
-      if(photo_aux.type == 0){
-        photo_aux.identifier = add_photo(&head, photo_aux.name);
-        print_list(head);
-      }else if(photo_aux.type ==1){
-        photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
-        print_list(head);
-      }else if(photo_aux.type ==2){
-        //function to do...
-        //photo_aux.type = search_by_keyword(head);
-      }else if(photo_aux.type ==3){
-        photo_aux.type = delete_photo(&head, photo_aux.identifier);
-        print_list(head);
-      }else if(photo_aux.type ==4){
-        photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
-      }else if(photo_aux.type ==5){
-        photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
-        print_list(head);
-      }else if(photo_aux.type == -1){
-        //ERROR ON EXIT TO RESOLVE
-        //disconnect client and close thread
-        break;
-      }else{
-        //TO DO
-      }
-
-    //send answer (echo)
-    nbytes = write(newsockfd, &photo_aux, sizeof(photo));
-    if( nbytes< 0){
-      perror("Write: ");
-      free(wa);
-      pthread_exit(NULL);
-    }
-    printf("replying %d bytes message type:%d\n", nbytes, photo_aux.type);
-  }
-
-  // communicate to gateway to change state
-  auxm.type = 4;
-  strcpy(auxm.address, wa->address);
-  auxm.port = atoi(wa->port);
-  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &(wa->gateway_addr), sizeof(wa->gateway_addr));
-  if( nbytes< 0){
-    perror("Sending to gateway: ");
-    free(wa);
-    pthread_exit(NULL);
-  }
-
-  //Confirmate disconnection to client
-  nbytes = write(newsockfd, &photo_aux, sizeof(photo));
-  if( nbytes< 0){
-    perror("Write: ");
-    free(wa);
-    pthread_exit(NULL);
-  }
-  printf("replying %d bytes message:%d\n", nbytes, photo_aux.type);
-
-  printf("Exiting thread\n");
-  gallery_clean_list(head);
-  free(wa);
-  pthread_exit(NULL);
 }
