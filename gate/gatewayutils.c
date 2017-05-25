@@ -54,6 +54,7 @@ int delete_server(servernode **head, char* address, int port, message_gw *auxm, 
   servernode *aux = *head;
   servernode *aux0= *head;
 
+
   //Empty list
   if(*head == NULL)
     return(-1);
@@ -63,6 +64,8 @@ int delete_server(servernode **head, char* address, int port, message_gw *auxm, 
     return(0);
   }
 
+
+
   while(aux !=NULL){
     if((strcmp(address, aux->address)==0) && (port == aux->port)){
       //server found
@@ -71,8 +74,11 @@ int delete_server(servernode **head, char* address, int port, message_gw *auxm, 
       //auxm
       auxm->type = 0;
       aux = aux->next;
-      strcpy(auxm->address,aux->address);
-      auxm->port = aux->port;
+      //last node of list, and if we dont have only one node in list
+      if(aux == NULL && (*head)->next !=NULL){
+        strcpy(auxm->address,(*head)->address);
+        auxm->port = (*head)->port;
+      }
 
       //auxm2
       auxm2->type = 0;
@@ -82,7 +88,6 @@ int delete_server(servernode **head, char* address, int port, message_gw *auxm, 
     }
     aux0 = aux;
     aux= aux->next;
-
   }
   //no server found
   return(-1);

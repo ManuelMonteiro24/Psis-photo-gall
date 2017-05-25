@@ -282,7 +282,6 @@ int main(int argc, char *argv[]){
             auxm.type = 5;
             strcpy(auxm.address, wa->address);
             auxm.port = atoi(wa->port);
-            printf("hello\n");
             nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
             if( nbytes< 0) perror("Sending to gateway: ");
             pthread_mutex_destroy(&mutex);

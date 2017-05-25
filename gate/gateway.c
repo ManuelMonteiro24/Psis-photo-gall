@@ -108,6 +108,7 @@ void * peers_server(void * arg){
       print_server_list(head);
     }else{
       //auxm receives the next of the deleted and auxm2 the peer behind it
+
       if(delete_server(&head,auxm.address, auxm.port, &auxm, &auxm2)== 1){
 
         //contact with gateway
