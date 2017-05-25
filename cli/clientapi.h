@@ -14,7 +14,6 @@
 #include <arpa/inet.h>
 
 //serialize data to do....
-#pragma pack(1)
 typedef struct message_gw{
    int type;
    char address[20];

@@ -25,8 +25,6 @@ pthread_mutex_t mutex;
 
 void * peers_sync(void * arg){
 
-
-
   int sock_gt = *(int*) arg;
 
   message_gw auxm;
@@ -175,14 +173,14 @@ int main(int argc, char *argv[]){
     message_gw auxm;
     struct sockaddr_in local_addr;
     struct sockaddr_in client_addr;
-    struct sockaddr_in gateway_addr;
     socklen_t size_addr;
 
     //var for threads
     pthread_t thread_id, sync_thread;
     struct workerArgs *wa;
 
-    int nbytes, clilen, newsockfd, portno;
+    int nbytes, newsockfd, portno;
+    unsigned int clilen;
 
     if (argc < 5) {
          fprintf(stderr,"Usage: serveraddr serverport gatewayaddress gatewayport\n");
@@ -237,6 +235,7 @@ int main(int argc, char *argv[]){
     if( nbytes< 0) perror("Receiving from gateway: ");
     printf("received %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
 
+    /*
     //SET NEXT PEER if it isnt peer online
     if(auxm.port != 0){
       bzero((char *) &next_peer_addr, sizeof(next_peer_addr));
@@ -245,6 +244,7 @@ int main(int argc, char *argv[]){
       next_peer_addr.sin_port = htons(auxm.port);
     }
     pthread_mutex_init(&next_peer_lock, NULL);
+
 
     //Peers sync thread
     if(pthread_create(&sync_thread, NULL, peers_sync, &sock_gt) != 0){
@@ -258,6 +258,7 @@ int main(int argc, char *argv[]){
 
     //Initiate mutex that protects list
     pthread_mutex_init(&mutex, NULL);
+    */
 
     listen(sock_fd,5);
     clilen = sizeof(client_addr);
@@ -269,12 +270,19 @@ int main(int argc, char *argv[]){
           perror("Accept: ");
         }
 
+        wa = malloc(sizeof(struct workerArgs));
+        wa->gatesock = sock_gt;
+        wa->clisock = newsockfd;
+        strcpy(wa->address, argv[1]);
+        strcpy(wa->port, argv[2]);
+
         //ctrl-c pressed!
           if(flag ==1){
             //send message to remove from gateway
             auxm.type = 5;
             strcpy(auxm.address, wa->address);
             auxm.port = atoi(wa->port);
+            printf("hello\n");
             nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
             if( nbytes< 0) perror("Sending to gateway: ");
             pthread_mutex_destroy(&mutex);
@@ -284,11 +292,6 @@ int main(int argc, char *argv[]){
             exit(0);
           }
 
-          wa = malloc(sizeof(struct workerArgs));
-          wa->gatesock = sock_gt;
-          wa->clisock = newsockfd;
-          strcpy(wa->address, argv[1]);
-          strcpy(wa->port, argv[2]);
 
           if(pthread_create(&thread_id, NULL, handle_client, wa) != 0){
             perror("Could not create thread");

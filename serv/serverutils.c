@@ -7,12 +7,12 @@ int add_photo(photo** head, char *name){
   int aux_flag = 0;
   photo* aux = *head;
 
-  srand(time(NULL)*pthread_self());
+  srand((int)time(NULL)*(int)pthread_self());
   int random_number, photo_count;
 
   while(1){
     random_number = rand() %501;
-    photo_count = (pthread_self()*random_number)/(time(NULL)*random_number*random_number);
+    photo_count = ((int)pthread_self()*random_number)/((int)(time(NULL))*random_number*random_number);
     //Check if identifier already is in use
     if(aux == NULL)
       break;

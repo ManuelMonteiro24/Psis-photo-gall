@@ -5,4 +5,4 @@ all:
 				gcc $(FLAGS) gateway.c gatewayutils.c -o gateway $(OPTIONS)
 
 clean:
-				rm *o gateway
+				rm gateway

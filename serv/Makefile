@@ -5,4 +5,4 @@ all:
 				gcc $(FLAGS) server.c serverutils.c -o server $(OPTIONS)
 
 clean:
-				rm *o server
+				rm server

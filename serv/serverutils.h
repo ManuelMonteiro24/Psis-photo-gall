@@ -23,6 +23,7 @@ typedef struct workerArgs{
   int gatesock;
   int clisock;
   char address[20], port[20];
+  struct sockaddr_in gateway_addr;
 }workerArgs;
 
 typedef struct photo{
