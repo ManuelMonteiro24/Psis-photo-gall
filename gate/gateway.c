@@ -68,15 +68,16 @@ void * peers_server(void * arg){
 
     //process message, process for server avalbility to do...
     pthread_mutex_lock(&mutex);
-    if(auxm.type ==1){
+    if(auxm.type == 1){
       //ADDRESS and port from the peer that just register
       strcpy(address_aux,auxm.address);
       port_aux = auxm.port;
 
       //auxm recv server after the register peer and auxm2 recv server before the register peer
-      ret_aux = insert_server(&head, auxm.address,auxm.port, &auxm, &auxm2);
+      ret_aux = insert_server(&head, auxm.address, auxm.port, &auxm, &auxm2);
 
       print_server_list(head);
+      printf("PORT %d\n", auxm.port);
       //send answer back to the server that just register
       nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, (const struct sockaddr *) &peer_addr, sizeof(peer_addr));
       if( nbytes< 0) perror("Write: ");

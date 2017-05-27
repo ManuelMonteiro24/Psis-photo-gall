@@ -1,67 +1,49 @@
 #include "serverutils.h"
 
 //insert at the end of the list, 0-> error, integer ->sucesssfull
-int add_photo(photo** head, char *name){
+uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_size){
 
   //generate random number for photo identifier
-  int aux_flag = 0;
-  photo* aux = *head;
+  int exists;
+  photo *aux, *new_photo = (photo *) malloc(sizeof(photo));
+  char file_id[100]; //CHANGE TO APPROPRIATE VALUE
 
-  srand((int)time(NULL)*(int)pthread_self());
-  int random_number, photo_count;
+  srand((int) time(NULL)*(int) pthread_self());
+  int random_number, photo_id;
 
-  while(1){
-    random_number = rand() %501;
-    photo_count = ((int)pthread_self()*random_number)/((int)(time(NULL))*random_number*random_number);
-    //Check if identifier already is in use
-    if(aux == NULL)
-      break;
+  //generate an exclusive photo id; must be different for all photos
+  do{
+    exists = 0;
+    random_number = rand() % 501;
+    photo_id = ((int)pthread_self()*random_number)/((int)(time(NULL))*random_number*random_number);
 
-    while(aux !=NULL){
-      if(aux->identifier == photo_count){
-        aux_flag = 1;
+    for(aux = *head; aux != NULL; aux = aux->next){
+      if(aux->identifier == photo_id){
+        exists = 1;
         break;
       }
-      aux = aux->next;
     }
-    if(aux_flag == 0)
-      break;
-  }
-
-  photo* new_photo;
-  new_photo = (photo*)malloc(sizeof(photo));
-  if(new_photo == NULL){
-    printf("Error creating photo\n");
-    return(0);
-  }
+  } while(exists);
 
   //generate file on disk to save photo data
-  char str[BUFFERSIZE];
-  char straux[BUFFERSIZE];
-  name[strlen(name) - 1] = 0;
-  strcpy(str, name);
-  sprintf(straux, "%d", photo_count);
-  strcat(str, straux);
-  //need to aditionate one more strcat to ".png" ???? for photos
+  sprintf(file_id, "%d", photo_id);
 
-  FILE *fptr;
-  fptr = fopen(str, "rb+");
-  if(fptr == NULL) //if file does not exist, create it, if it does let it be
-  {
-    fptr = fopen(str, "wb");
-    if(fptr == NULL){
-      perror("Photo file");
-      return(0);
-    }
-    //INSERT PHOTO DATA TO FILE TO DO...
+  FILE *new_file;
+  new_file = fopen(file_id, "w+");
+  if(new_file == NULL){
+    perror("ADD PHOTO: ");
+    return -1;
   }
-  fclose(fptr);
 
-  new_photo->identifier = photo_count;
-  strcpy(new_photo->name, name);
+  fwrite(file_bytes, file_size, 1, new_file);
+  fclose(new_file);
+
+  new_photo->identifier = photo_id;
+  strcpy(new_photo->name, file_name);
   new_photo->key_header = NULL;
-  new_photo-> next = NULL;
+  new_photo->next = NULL;
 
+  //head = new_photo;
   aux = *head;
   if(*head == NULL){
     *head = new_photo;
@@ -77,7 +59,7 @@ int add_photo(photo** head, char *name){
     }
   }
 
-  return(photo_count);
+  return(photo_id);
 }
 
 // -1 -> error, 0 ->no photo 1->sucess
@@ -227,7 +209,7 @@ int gallery_get_photo(photo* head,uint32_t id_photo, photo* photo_aux){
 }
 
 //debug
-void print_list(photo* head){
+void print_list(photo *head){
 
   if(head == NULL){
     printf("Empty list!\n");

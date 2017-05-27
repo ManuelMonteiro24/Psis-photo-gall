@@ -102,41 +102,53 @@ int gallery_connect(char * host, in_port_t port){
 uint32_t gallery_add_photo(int peer_socket, char *file_name){
 
   int nbytes;
+  uint32_t id;
   struct photo photo_aux;
+  Message msg;
+  char *file_bytes; //char type is 1 byte long
 
-  //process photo file
-  //error opening file in my PC dunno why???????????????????
-  /*
-  FILE *fd = fopen(file_name,"r");
-  if(fd==NULL){
-    perror("Photo file");
+  file_name[strlen(file_name) - 1] = 0;
+  FILE *fd = fopen("images.jpeg","r+");
+  if(fd == NULL){
+    perror("Photo file ");
     return 0;
   }
+
+  fseek(fd, 0, SEEK_END); //set stream pointer @fd to end-of-file
+  long file_size = ftell(fd); //get fd current possition in stream
+  file_bytes = malloc(file_size);
+
+  msg.type = 0;
+  strcpy(msg.payload, file_name);
+  rewind(fd); //start reading file from the beginning
+  fread(file_bytes, file_size, 1, fd);
   fclose(fd);
-  */
 
-  //get photo to do...
-  photo_aux.type = 0;
-  strcpy(photo_aux.name,file_name);
-
-  /* send photo to do... */
-  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
+  nbytes = write(peer_socket, &msg, sizeof(msg));
   if(nbytes< 0){
     perror("Write: ");
     return(0);
   }
-  printf("sent %d %d\n", nbytes, photo_aux.type);
+  printf("sent add photo msg (%d bytes) type %d\n", nbytes, msg.type);
+
+  nbytes = write(peer_socket, file_bytes, file_size);
+  if(nbytes < 0){
+    perror("Write: ");
+    return(0);
+  }
+  printf("sent photo (%d bytes) file_size %d\n", nbytes, (int) file_size);
 
   /* receive photo identifier to do... */
-  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
-  if(nbytes< 0){
+  nbytes = read(peer_socket, &id, sizeof(int));
+  if(nbytes < 0){
     perror("Read: ");
     return(0);
   }
-  printf("received %d bytes : %d \n", nbytes,  photo_aux.type);
+  printf("received %d bytes id: %d \n", nbytes, id);
 
   //return photo idetifier to do...
-  return(photo_aux.identifier);
+  return id;
+
 }
 
 //returns 1->sucess 0->no photo with that iden -1->error

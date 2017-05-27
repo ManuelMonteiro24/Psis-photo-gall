@@ -62,10 +62,13 @@ void * handle_client(void * arg){
 
   message_gw auxm;
   int nbytes, sock_gt, newsockfd;
+  uint32_t id;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
 
   struct photo photo_aux;
+  Message msg;
+  char file_bytes[MAX_FILE_SIZE];
 
   pthread_detach(pthread_self());
 
@@ -82,53 +85,79 @@ void * handle_client(void * arg){
 
   while(1){
       // read message
-      nbytes = read(newsockfd,&photo_aux,sizeof(photo_aux));
-      if( nbytes< 0){
-        perror("Read: ");
+      nbytes = read(newsockfd, &msg, sizeof(msg));
+      if( nbytes < 0 ){
+        perror("Received message: ");
         free(wa);
         pthread_exit(NULL);
       }
 
-      //printf("NEXT PEER: address %s port %d\n", pee );
-
-      //process message
+      /*Process message:
+      type 0: add photo,
+      type 1: add keyword,
+      type 2: search by keyword,
+      type 3: delete photo,
+      type 4: get photo from gallery,
+      type 5: ??
+      */
       pthread_mutex_lock(&mutex);
-      if(photo_aux.type == 0){
-        photo_aux.identifier = add_photo(&head, photo_aux.name);
-        print_list(head);
-        //SEND PHOTO TO THE NEXT PEER TO DO...
-      }else if(photo_aux.type ==1){
-        photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
-        print_list(head);
-        //SEND UPDATE TO THE NEXT PEER TO DO...
-      }else if(photo_aux.type ==2){
-        //function to do...
-        //photo_aux.type = search_by_keyword(head);
-      }else if(photo_aux.type ==3){
-        photo_aux.type = delete_photo(&head, photo_aux.identifier);
-        print_list(head);
-        //SEND UPDATE TO THE NEXT PEER TO DO...
-      }else if(photo_aux.type ==4){
-        photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
-      }else if(photo_aux.type ==5){
-        photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
-        print_list(head);
-      }else{
-        //ERROR ON EXIT TO RESOLVE
-        //disconnect client and close thread
-        break;
-      }
+      switch(msg.type){
+        case 0:
+          nbytes = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
+          printf("received photo with %d bytes\n", nbytes);
+          if( nbytes < 0 ){
+            perror("Read: ");
+            free(wa);
+            pthread_exit(NULL);
+          }
+          id = add_photo(&head, msg.payload, file_bytes, nbytes);
+          nbytes = write(newsockfd, &id, sizeof(int)); //send photo identifier to client
+          printf("photo id: %d", id);
+          print_list(head);
+          break;
 
+        case 1:
+          photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
+          print_list(head);
+          //SEND UPDATE TO THE NEXT PEER TO DO...
+          break;
+
+        case 2:
+          //function to do...
+          //photo_aux.type = search_by_keyword(head);
+          break;
+
+        case 3:
+          photo_aux.type = delete_photo(&head, photo_aux.identifier);
+          print_list(head);
+          //SEND UPDATE TO THE NEXT PEER TO DO...
+          break;
+
+        case 4:
+          photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
+          break;
+
+        case 5:
+          photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
+          print_list(head);
+          break;
+
+        default:
+          printf("ERROR: received message type matched by default\n");
+          //ERROR ON EXIT TO RESOLVE
+          //disconnect client and close thread
+          break;
+      }
       pthread_mutex_unlock(&mutex);
 
     //send answer (echo)
-    nbytes = write(newsockfd, &photo_aux, sizeof(photo));
+  /*nbytes = write(newsockfd, &photo_aux, sizeof(photo));
     if( nbytes< 0){
       perror("Write: ");
       free(wa);
       pthread_exit(NULL);
     }
-    printf("replying %d bytes message type:%d\n", nbytes, photo_aux.type);
+    printf("replying %d bytes message type:%d\n", nbytes, photo_aux.type);*/
   }
 
   // communicate to gateway to change state
@@ -229,7 +258,7 @@ int main(int argc, char *argv[]){
 
     //send checkin message to gateway
     nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
-    if( nbytes< 0) perror("Sending to gateway: ");
+    if( nbytes < 0) perror("Sending to gateway: ");
 
     nbytes = recv(sock_gt, &auxm, sizeof( struct message_gw),0);
     if( nbytes< 0) perror("Receiving from gateway: ");
@@ -278,12 +307,12 @@ int main(int argc, char *argv[]){
 
         //ctrl-c pressed!
           if(flag ==1){
-            //send message to remove from gateway
+            //send message to remove from gateway type 5
             auxm.type = 5;
             strcpy(auxm.address, wa->address);
             auxm.port = atoi(wa->port);
             nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
-            if( nbytes< 0) perror("Sending to gateway: ");
+            if( nbytes < 0 ) perror("Sending to gateway: ");
             pthread_mutex_destroy(&mutex);
             pthread_mutex_destroy(&next_peer_lock);
             close(sock_gt);

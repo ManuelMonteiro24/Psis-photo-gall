@@ -2,7 +2,7 @@ CFLAGS = -g -Wall
 OPTIONS =
 
 all:
-				gcc $(FLAGS) client.c clientapi.c -o client $(OPTIONS)
+				gcc $(FLAGS) client.c clientapi.h clientapi.c -o client $(OPTIONS)
 
 clean:
-				rm  client
+				rm client

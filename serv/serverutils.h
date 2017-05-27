@@ -2,6 +2,7 @@
 #define SERVERUTILS
 
 #define BUFFERSIZE 100
+#define MAX_FILE_SIZE 100000 //bytes
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +26,11 @@ typedef struct workerArgs{
   char address[20], port[20];
   struct sockaddr_in gateway_addr;
 }workerArgs;
+
+typedef struct message{
+    int type;
+    char payload[20];
+} Message;
 
 typedef struct photo{
   int type; // -1->disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photon
@@ -50,7 +56,7 @@ typedef struct message_gw{
 
 photo* create_photo_list();
 
-int add_photo(photo** head,char *name);
+uint32_t add_photo(photo **head, char *name, char *file_bytes, int file_size);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword);
 int delete_photo(photo** head, uint32_t identifier);
