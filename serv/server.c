@@ -85,12 +85,17 @@ void * handle_client(void * arg){
 
   while(1){
       // read message
+      memset(&msg, -1, sizeof(msg));
       nbytes = read(newsockfd, &msg, sizeof(msg));
       if( nbytes < 0 ){
         perror("Received message: ");
         free(wa);
         pthread_exit(NULL);
-      }
+      }/* else if(nbytes == 0){
+        printf("Connection closed by the client..\n");
+        free(wa);
+        pthread_exit(NULL);
+      }*/
 
       /*Process message:
       type 0: add photo,
@@ -112,7 +117,6 @@ void * handle_client(void * arg){
           }
           id = add_photo(&head, msg.payload, file_bytes, nbytes);
           nbytes = write(newsockfd, &id, sizeof(int)); //send photo identifier to client
-          printf("photo id: %d", id);
           print_list(head);
           break;
 
@@ -146,6 +150,8 @@ void * handle_client(void * arg){
           printf("ERROR: received message type matched by default\n");
           //ERROR ON EXIT TO RESOLVE
           //disconnect client and close thread
+          free(wa);
+          pthread_exit(NULL);
           break;
       }
       pthread_mutex_unlock(&mutex);
@@ -293,6 +299,7 @@ int main(int argc, char *argv[]){
     clilen = sizeof(client_addr);
     while(1){
 
+        printf("accept\n");
         newsockfd = accept(sock_fd, (struct sockaddr *) &client_addr, &clilen);
         if(newsockfd < 0){
           close(newsockfd);

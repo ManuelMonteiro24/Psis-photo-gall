@@ -8,14 +8,20 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
   photo *aux, *new_photo = (photo *) malloc(sizeof(photo));
   char file_id[100]; //CHANGE TO APPROPRIATE VALUE
 
-  srand((int) time(NULL)*(int) pthread_self());
+  time_t rawtime;
+  struct tm *time_info;
+
+  time(&rawtime);
+  time_info = localtime(&rawtime);
+  srand((int) time_info->tm_sec*(int) pthread_self());
   int random_number, photo_id;
 
   //generate an exclusive photo id; must be different for all photos
   do{
     exists = 0;
     random_number = rand() % 501;
-    photo_id = ((int)pthread_self()*random_number)/((int)(time(NULL))*random_number*random_number);
+    time_info = localtime(&rawtime);
+    photo_id = ((int)pthread_self()*random_number)/(time_info->tm_sec*random_number*random_number);
 
     for(aux = *head; aux != NULL; aux = aux->next){
       if(aux->identifier == photo_id){
@@ -23,7 +29,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
         break;
       }
     }
-  } while(exists);
+  } while(exists && photo_id == 0);
 
   //generate file on disk to save photo data
   sprintf(file_id, "%d", photo_id);
@@ -41,11 +47,10 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
   new_photo->identifier = photo_id;
   strcpy(new_photo->name, file_name);
   new_photo->key_header = NULL;
-  new_photo->next = NULL;
+  new_photo->next = *head;
 
-  //head = new_photo;
-  aux = *head;
-  if(*head == NULL){
+  *head = new_photo; //insert in the beginning of the list
+/*  if(*head == NULL){
     *head = new_photo;
   }else{
     //1 server on list
@@ -57,7 +62,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
       }
       aux->next = new_photo;
     }
-  }
+  }*/
 
   return(photo_id);
 }
