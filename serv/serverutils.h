@@ -3,6 +3,7 @@
 
 #define BUFFERSIZE 100
 #define MAX_FILE_SIZE 100000 //bytes
+#define MAX_WORD_SIZE 20 //bytes
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,20 +31,20 @@ typedef struct workerArgs{
 typedef struct message{
     int type;
     uint32_t identifier;
-    char payload[20];
+    char payload[MAX_WORD_SIZE];
 } Message;
 
 typedef struct photo{
   int type; // -1->disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photon
   uint32_t identifier;
-  char name[20];
+  char name[MAX_WORD_SIZE];
   struct keyword * key_header;
   //falta binary data
   struct photo *next;
 }photo;
 
 typedef struct keyword{
-  char word[20];
+  char word[MAX_WORD_SIZE];
   struct keyword *next;
 }keyword;
 
@@ -65,7 +66,7 @@ uint32_t add_photo(photo **head, char *name, char *file_bytes, int file_size);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int get_photo_by_keyword(photo* head, struct identifier **ids, char *keyword);
 int delete_photo(photo** head, uint32_t identifier);
-int gallery_get_photo_name(photo* head, uint32_t id_photo, photo* photo_aux);
+int gallery_get_photo_name(photo* head, uint32_t id_photo, char file_name[MAX_WORD_SIZE]);
 int gallery_get_photo(photo* head, uint32_t id_photo, photo* photo_aux);
 void print_list(photo * head);
 void gallery_clean_list(photo * head);

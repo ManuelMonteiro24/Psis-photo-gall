@@ -2,36 +2,7 @@
 
 //-1 -> error 0 -> sucess
 int gallery_disconnect(int peer_socket){
-
-  int nbytes;
-  struct photo photo_aux;
-
-  photo_aux.type = -1;
-
-  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
-  if(nbytes< 0){
-    perror("Write: ");
-    return(-1);
-  }
-  printf("sent %d message type:%d\n", nbytes, photo_aux.type);
-
-  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
-  if(nbytes< 0){
-    perror("Read: ");
-    return(-1);
-  }
-  printf("received %d message type:%d\n", nbytes, photo_aux.type);
-
-  //ERROR here not receiving correct by server, ERROR on photo struct???
-  //client and server not sending/reciving same bytes
-
-  if(photo_aux.type == -1){
-    close(peer_socket);
-    return(0);
-  }else{
-    //error
-    return(-1);
-  }
+  return close(peer_socket);
 }
 
 int gallery_connect(char * host, in_port_t port){
@@ -250,38 +221,35 @@ int gallery_search_photo(int peer_socket, char * keyword, uint32_t **photos_id){
 int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name){
 
   char buffer[BUFFERSIZE];
-  int nbytes;
+  int nbytes, ret;
   struct photo photo_aux;
+  Message msg;
 
   //send photo identifier
-  photo_aux.type = 4;
-  photo_aux.identifier = id_photo;
+  msg.type = 4;
+  msg.identifier = id_photo;
 
-  /* send message to do... */
-  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
-  if(nbytes< 0){
+  nbytes = write(peer_socket, &msg, sizeof(msg));
+  if(nbytes < 0){
     perror("Write: ");
     return(-1);
   }
-  printf("sent %d %d\n", nbytes, photo_aux.type);
+  printf("sent %d %d\n", nbytes, msg.type);
 
-  /* receive photo_name to do... */
-  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
+  *photo_name = (char *) calloc(MAX_WORD_SIZE, sizeof(char));
+  nbytes = read(peer_socket, *photo_name, MAX_WORD_SIZE);
   if(nbytes< 0){
     perror("Read: ");
     return(-1);
   }
-  if(photo_aux.type == 1){
-    //create output vector
-    *photo_name = (char*)calloc(1,BUFFERSIZE);
-    if(photo_name == NULL){
-      printf("Error creating photo_name vector\n");
-      return -1;
-    }
-    strcpy(*photo_name,photo_aux.name);
+
+  nbytes = read(peer_socket, &ret, 4);
+  if(nbytes < 0){
+    perror("Read: ");
+    return(-1);
   }
 
-  return photo_aux.type;
+  return ret;
 }
 
 //returns 1-> photo downloaded sucesssfully 0->photo doenst exists -1->error

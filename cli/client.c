@@ -72,11 +72,15 @@ int main(int argc, char *argv[]){
         printf("%d\n", photos_id[it]);
       }
      }
-/*
+
     // gallery_get_photo_name example
 
-    char * photo_name;
-
+    char *photo_name;
+    printf("Insert id of photo to get name: \n");
+    fgets(buffer, BUFFERSIZE, stdin);
+    if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
+      printf("ERROR: invalid input\n");
+    }
     ret_aux = gallery_get_photo_name(sock_fd, photo_id, &photo_name);
     if(ret_aux == -1){
       close(sock_fd);
@@ -87,7 +91,7 @@ int main(int argc, char *argv[]){
     }else{
       printf("Name of photo found: %s\n", photo_name);
 
-    }*/
+    }
 
     printf("Insert id of photo to delete: \n");
     fgets(buffer, BUFFERSIZE, stdin);
@@ -99,11 +103,11 @@ int main(int argc, char *argv[]){
     if(ret_aux == 0){
       printf("Photo to delete not found\n");
     }else{
-      printf("Remove sucesssfull\n");
+      printf("Remove sucessfull\n");
     }
 
     // gallery_get_photo example
-
+/*
     printf("Insert name of file to receive the downloaded photo: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
@@ -116,17 +120,12 @@ int main(int argc, char *argv[]){
       printf("No photo in the server with that identifier\n");
     }else{
       printf("Download sucesssfull photo saved in file: %s\n", buffer);
+    }*/
+
+
+    if(gallery_disconnect(sock_fd) != 0){
+      perror("On socket close ");
     }
 
-    //try to disconnect
-    while(1){
-
-      //client doesnt leave rigth away dunno why?
-      if(gallery_disconnect(sock_fd)==0){
-        close(sock_fd);
-        exit(0);
-      }else{
-        printf("Error disconnect\n");
-      }
-  }
+  return 0;
 }

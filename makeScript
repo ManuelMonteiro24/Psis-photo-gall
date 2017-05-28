@@ -1,0 +1,38 @@
+#!/bin/bash
+# access makefiles from cli/, gate/ and serv/ from root dir (this dir)
+
+case ${1} in
+
+'all' )
+  cd cli && make && \
+  cd .. && cd gate && make && \
+  cd .. && cd serv && make && \
+  cd ..
+  ;;
+
+'cli' )
+  cd cli && make && \
+  cd ..
+  ;;
+
+'gate' )
+  cd gate && make && \
+  cd ..
+  ;;
+
+'serv' )
+  cd gate && make && \
+  cd ..
+  ;;
+
+'clean' )
+cd cli && make clean
+cd .. && cd gate && make clean
+cd .. && cd serv && make clean
+cd ..
+;;
+
+'' )
+  echo "script usage: ./makeScript <all/cli/gate/serv/clean>"
+
+esac

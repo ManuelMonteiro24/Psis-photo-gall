@@ -68,7 +68,7 @@ void * handle_client(void * arg){
 
   struct photo photo_aux;
   Message msg;
-  char file_bytes[MAX_FILE_SIZE];
+  char file_bytes[MAX_FILE_SIZE], file_name[MAX_WORD_SIZE];
   struct identifier *ids, *aux_id, *rm;
   ids = aux_id = NULL;
 
@@ -104,7 +104,7 @@ void * handle_client(void * arg){
       type 1: add keyword,
       type 2: search by keyword,
       type 3: delete photo,
-      type 4: get photo from gallery,
+      type 4: get photo name by id,
       type 5: ??
       */
       pthread_mutex_lock(&mutex);
@@ -139,16 +139,17 @@ void * handle_client(void * arg){
           }
           for(aux_id = rm = ids; aux_id != NULL; rm = aux_id, aux_id = aux_id->next){
               nbytes = write(newsockfd, &aux_id->id, sizeof(int)); //send return signal to client
-              if(aux_id != ids){
-                free(rm);
-              }
               if( nbytes < 0 ){
                 perror("Write ret type 2(1): ");
                 free(wa);
                 pthread_exit(NULL);
               }
+              if(aux_id != ids){
+                free(rm);
+              }
           }
           free(rm); //free last element
+          ids = NULL;
           break;
 
         case 3:
@@ -158,7 +159,14 @@ void * handle_client(void * arg){
           break;
 
         case 4:
-          ret = gallery_get_photo_name(head, msg.identifier,&photo_aux);
+          ret = gallery_get_photo_name(head, msg.identifier, file_name);
+          nbytes = write(newsockfd, file_name, MAX_WORD_SIZE); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write type 4 ");
+            free(wa);
+            pthread_exit(NULL);
+          }
+          memset(file_name, 0, MAX_WORD_SIZE);
           break;
 
         case 5:

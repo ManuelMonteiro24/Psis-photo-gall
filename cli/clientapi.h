@@ -2,6 +2,7 @@
 #define CLIENTAPI
 
 #define BUFFERSIZE 100
+#define MAX_WORD_SIZE 20
 
 #include <stdio.h>
 #include <stdlib.h>

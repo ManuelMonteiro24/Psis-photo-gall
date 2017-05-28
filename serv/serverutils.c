@@ -14,7 +14,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
   time(&rawtime);
   time_info = localtime(&rawtime);
   srand((int) time_info->tm_sec*(int) pthread_self());
-  int random_number, print;
+  int random_number, photo_id;
 
   //generate an exclusive photo id; must be different for all photos
   do{
@@ -176,21 +176,21 @@ int delete_photo(photo** head, uint32_t identifier){
 }
 
 // 0 ->no photo 1->sucesssfull
-int gallery_get_photo_name(photo* head, uint32_t id_photo, photo* photo_aux){
+int gallery_get_photo_name(photo *head, uint32_t id_photo, char file_name[MAX_WORD_SIZE]){
 
-  if(head==NULL){
+  if(head == NULL){
     printf("Empty list\n");
     return(0);
   }
 
   photo *aux = head;
 
-  while(aux!= NULL){
+  while(aux != NULL){
     if(aux->identifier == id_photo){
-      strcpy(photo_aux->name,aux->name);
+      strcpy(file_name, aux->name);
       return(1);
     }
-  aux = aux->next;
+    aux = aux->next;
   }
   return(0);
 }
