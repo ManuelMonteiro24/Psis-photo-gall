@@ -6,7 +6,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
   //generate random number for photo identifier
   int exists;
   photo *aux, *new_photo = (photo *) malloc(sizeof(photo));
-  char file_id[100]; //CHANGE TO APPROPRIATE VALUE
+  char file_id[10]; //CHANGE TO APPROPRIATE VALUE
 
   time_t rawtime;
   struct tm *time_info;
@@ -14,7 +14,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
   time(&rawtime);
   time_info = localtime(&rawtime);
   srand((int) time_info->tm_sec*(int) pthread_self());
-  int random_number, photo_id;
+  int random_number, print;
 
   //generate an exclusive photo id; must be different for all photos
   do{
@@ -33,7 +33,6 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
 
   //generate file on disk to save photo data
   sprintf(file_id, "%d", photo_id);
-
   FILE *new_file;
   new_file = fopen(file_id, "w+");
   if(new_file == NULL){
@@ -50,62 +49,48 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
   new_photo->next = *head;
 
   *head = new_photo; //insert in the beginning of the list
-/*  if(*head == NULL){
-    *head = new_photo;
-  }else{
-    //1 server on list
-    if(aux->next == NULL){
-      aux->next = new_photo;
-    }else{
-      while(aux->next != NULL){
-        aux = aux->next;
-      }
-      aux->next = new_photo;
-    }
-  }*/
-
-  return(photo_id);
+  return photo_id;
 }
 
 // -1 -> error, 0 ->no photo 1->sucess
-int add_keyword(photo* head, uint32_t identifier, char *keyword_input){
+int add_keyword(photo *head, uint32_t identifier, char *keyword_input){
 
   //first search for photo
   if(head == NULL){
     printf("Empty list\n");
     return(0);
   }
-  photo* aux = head;
+  photo *aux = head;
 
   while(aux != NULL){
-
-    //photo found add keyword
+    //photo found; add keyword
     if(identifier == aux->identifier){
 
       keyword* new_keyword;
-      new_keyword = (keyword*)malloc(sizeof(keyword));
+      new_keyword = (keyword*) malloc(sizeof(keyword));
+
       if(new_keyword == NULL){
         printf("Error creating keyword\n");
         return(-1);
       }
-      strcpy(new_keyword->name, keyword_input);
+
+      strcpy(new_keyword->word, keyword_input);
       new_keyword->next = NULL;
 
       if(aux->key_header == NULL){
         aux->key_header = new_keyword;
-      }else{
-        keyword *aux_keyword = aux->key_header;
-        while(aux_keyword!= NULL){
 
+      } else{
+        keyword *aux_keyword = aux->key_header;
+        while(aux_keyword != NULL){
           //keyword duplicates not allowed
-          if(strcmp(keyword_input, aux_keyword->name) == 0){
+          if(strcmp(keyword_input, aux_keyword->word) == 0){
             printf("keyword already in photo\n");
             free(new_keyword);
             return(-1);
           }
           aux_keyword = aux_keyword->next;
         }
-
         aux_keyword->next = new_keyword;
       }
       return(1);
@@ -117,58 +102,77 @@ int add_keyword(photo* head, uint32_t identifier, char *keyword_input){
 }
 
 // -1 -> error, 0 ->no photos integer->number of photos count
-int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword_input){
-
-  //create id_photos to send to do..??
+int get_photo_by_keyword(photo *head, struct identifier **ids, char *keyword_input){
 
   if(head == NULL){
     printf("Empty list\n");
     return(0);
   }
 
-  photo* aux = head;
-  keyword* keyword_aux = NULL;
+  photo *aux = head;
+  keyword *keyword_aux = NULL;
+  struct identifier *aux_id = NULL;
   int photo_count = 0;
 
   while(aux != NULL){
     keyword_aux = aux->key_header;
     while(keyword_aux != NULL){
-      if(strcmp(keyword_input, keyword_aux->name) == 0){
+      if(strcmp(keyword_input, keyword_aux->word) == 0){
         photo_count++;
-        // add to the id_photos
+        aux_id = (struct identifier *) calloc(1, sizeof(struct identifier));
+        aux_id->id = aux->identifier;
+
+        if((*ids) == NULL){
+          aux_id->next = NULL;
+        } else{
+          aux_id->next = *ids;
+        }
+
+        *ids = aux_id;
+        break;
       }
       keyword_aux = keyword_aux->next;
     }
     aux = aux->next;
   }
 
-  return(photo_count);
+  return photo_count;
 }
 
-// 0 ->no photo 1->sucesssfull
+//0 ->no photo 1->sucesssfull
 int delete_photo(photo** head, uint32_t identifier){
+
+  photo *aux1, *aux2 = *head;
+  char file_name[10];
+  int found = 0;
 
   if(*head == NULL){
     printf("Empty list\n");
     return(0);
   }
-  photo *aux1 = *head;
-  photo *aux2 = *head;
 
-  if(((*head)->next == NULL) && (identifier == aux1->identifier)){
-    *head = NULL;
-    return(1);
+  if(identifier == (*head)->identifier){ //only case where *head needs to be updated
+    *head = (*head)->next;
+    sprintf(file_name, "%d", (int) aux2->identifier);
+    if(unlink(file_name) == -1){ //delete file from file system
+      perror("Deleting file ");
+    }
+    free(aux2);
+    return 1;
   }
 
-  while(aux1!= NULL){
+  for(aux1 = (*head)->next; aux1 != NULL; aux2 = aux1, aux1 = aux1->next){
     if(identifier == aux1->identifier){
       aux2->next = aux1->next;
-      return(1);
+      sprintf(file_name, "%d", (int) aux1->identifier);
+      if(unlink(file_name)  == -1){ //delete file from file system
+        perror("Deleting file ");
+      }
+      return 1;
     }
-    aux2 = aux1;
-    aux1 = aux1->next;
   }
-  return(0);
+
+  return 0;
 }
 
 // 0 ->no photo 1->sucesssfull
@@ -179,10 +183,10 @@ int gallery_get_photo_name(photo* head, uint32_t id_photo, photo* photo_aux){
     return(0);
   }
 
-  photo * aux = head;
+  photo *aux = head;
 
   while(aux!= NULL){
-    if(aux->identifier== id_photo){
+    if(aux->identifier == id_photo){
       strcpy(photo_aux->name,aux->name);
       return(1);
     }
@@ -221,7 +225,7 @@ void print_list(photo *head){
     return;
   }
 
-  printf("photo list: ");
+  printf("\nPhoto list: \n");
   photo* aux = head;
   keyword *aux2 = NULL;
   while (aux!=NULL) {
@@ -229,7 +233,7 @@ void print_list(photo *head){
     aux2 = aux->key_header;
     if(aux2 != NULL){
       while(aux2 != NULL){
-        printf(" %s", aux2->name);
+        printf(" %s", aux2->word);
         aux2=aux2->next;
       }
     }

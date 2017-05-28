@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]){
 
     char buffer[BUFFERSIZE];
-    int ret_aux;
+    int ret_aux, it;
 
     if (argc < 3) {
        fprintf(stderr,"usage gatewayhostname gatewayport\n");
@@ -40,40 +40,39 @@ int main(int argc, char *argv[]){
     ret_aux =  gallery_add_keyword(sock_fd, photo_id, buffer);
     if(ret_aux == -1){
       close(sock_fd);
-      fprintf(stderr,"Error duplicates or memory\n");
+      fprintf(stderr,"ERROR: duplicates or memory\n");
       exit(1);
     }else if(ret_aux == 0){
-      printf("Photo to add the keyword not found\n");
+      printf("ERROR: photo not found in server\n");
     }else{
-      printf("Keyword adding sucesssfull\n");
+      printf("Keyword added sucesssfully\n");
     }
 
 
     //gallery_search_photo example
 
-    uint32_t *id_photos;
+    uint32_t *photos_id;
 
-    printf("Insert keyword to receive the photos_id with that tag: \n");
+    printf("Search by keyword: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
-    int photo_count = gallery_search_photo(sock_fd, buffer, &id_photos);
+    int photo_count = gallery_search_photo(sock_fd, buffer, &photos_id);
     if(photo_count == -1){
       close(sock_fd);
-      fprintf(stderr,"Error Ocurred (invalid arguments, network problem or memory problem)\n");
+      fprintf(stderr,"ERROR: invalid arguments, network problem or memory problem\n");
       exit(1);
     }else if(photo_count == 0){
-      printf("No photo in the server with that keyword\n");
+      printf("  No photo in the server with that keyword\n");
     }else{
       printf("Number of photos with that keyword: %d\n", photo_count);
-      printf("Photos identifiers: \n");
+      printf("Photo identifiers: \n");
 
       //print photo_id TO CHECK...
-      /*for(int i=0;i<photo_count;i++){
-        printf("%d \n", id_photos[i]);
+      for(it = 0;it < photo_count; it++){
+        printf("%d\n", photos_id[it]);
       }
-      */
-    }
-
+     }
+/*
     // gallery_get_photo_name example
 
     char * photo_name;
@@ -88,8 +87,13 @@ int main(int argc, char *argv[]){
     }else{
       printf("Name of photo found: %s\n", photo_name);
 
-    }
+    }*/
 
+    printf("Insert id of photo to delete: \n");
+    fgets(buffer, BUFFERSIZE, stdin);
+    if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
+      printf("ERROR: invalid input\n");
+    }
     //gallery_delete_photo example
     ret_aux = gallery_delete_photo(sock_fd, photo_id);
     if(ret_aux == 0){

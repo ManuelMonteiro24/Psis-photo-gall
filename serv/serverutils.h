@@ -29,6 +29,7 @@ typedef struct workerArgs{
 
 typedef struct message{
     int type;
+    uint32_t identifier;
     char payload[20];
 } Message;
 
@@ -42,7 +43,7 @@ typedef struct photo{
 }photo;
 
 typedef struct keyword{
-  char name[20];
+  char word[20];
   struct keyword *next;
 }keyword;
 
@@ -53,12 +54,16 @@ typedef struct message_gw{
    int port;
 } message_gw;
 
+struct identifier{
+    uint32_t id;
+    struct identifier *next;
+};
 
 photo* create_photo_list();
 
 uint32_t add_photo(photo **head, char *name, char *file_bytes, int file_size);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
-int search_by_keyword(photo* head, uint32_t** id_photos, char *keyword);
+int get_photo_by_keyword(photo* head, struct identifier **ids, char *keyword);
 int delete_photo(photo** head, uint32_t identifier);
 int gallery_get_photo_name(photo* head, uint32_t id_photo, photo* photo_aux);
 int gallery_get_photo(photo* head, uint32_t id_photo, photo* photo_aux);

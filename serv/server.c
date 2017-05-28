@@ -62,13 +62,15 @@ void * handle_client(void * arg){
 
   message_gw auxm;
   int nbytes, sock_gt, newsockfd;
-  uint32_t id;
+  uint32_t ret;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
 
   struct photo photo_aux;
   Message msg;
   char file_bytes[MAX_FILE_SIZE];
+  struct identifier *ids, *aux_id, *rm;
+  ids = aux_id = NULL;
 
   pthread_detach(pthread_self());
 
@@ -91,11 +93,11 @@ void * handle_client(void * arg){
         perror("Received message: ");
         free(wa);
         pthread_exit(NULL);
-      }/* else if(nbytes == 0){
+      } else if(nbytes == 0){
         printf("Connection closed by the client..\n");
         free(wa);
         pthread_exit(NULL);
-      }*/
+      }
 
       /*Process message:
       type 0: add photo,
@@ -107,6 +109,7 @@ void * handle_client(void * arg){
       */
       pthread_mutex_lock(&mutex);
       switch(msg.type){
+
         case 0:
           nbytes = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
           printf("received photo with %d bytes\n", nbytes);
@@ -115,35 +118,51 @@ void * handle_client(void * arg){
             free(wa);
             pthread_exit(NULL);
           }
-          id = add_photo(&head, msg.payload, file_bytes, nbytes);
-          nbytes = write(newsockfd, &id, sizeof(int)); //send photo identifier to client
+          ret = add_photo(&head, msg.payload, file_bytes, nbytes);
           print_list(head);
+          //UPDATE ALL OTHER PEERS
           break;
 
         case 1:
-          photo_aux.type = add_keyword(head, photo_aux.identifier, photo_aux.name); //keyword por agora vai pelo name to change
+          ret = add_keyword(head, msg.identifier, msg.payload);
           print_list(head);
-          //SEND UPDATE TO THE NEXT PEER TO DO...
+          //UPDATE ALL OTHER PEERS
           break;
 
         case 2:
-          //function to do...
-          //photo_aux.type = search_by_keyword(head);
+          ret = get_photo_by_keyword(head, &ids, msg.payload);
+          nbytes = write(newsockfd, &ret, sizeof(int)); //send number of found photos to client
+          if( nbytes < 0 ){
+            perror("Write ret type 2(1): ");
+            free(wa);
+            pthread_exit(NULL);
+          }
+          for(aux_id = rm = ids; aux_id != NULL; rm = aux_id, aux_id = aux_id->next){
+              nbytes = write(newsockfd, &aux_id->id, sizeof(int)); //send return signal to client
+              if(aux_id != ids){
+                free(rm);
+              }
+              if( nbytes < 0 ){
+                perror("Write ret type 2(1): ");
+                free(wa);
+                pthread_exit(NULL);
+              }
+          }
+          free(rm); //free last element
           break;
 
         case 3:
-          photo_aux.type = delete_photo(&head, photo_aux.identifier);
+          ret = delete_photo(&head, msg.identifier);
           print_list(head);
           //SEND UPDATE TO THE NEXT PEER TO DO...
           break;
 
         case 4:
-          photo_aux.type = gallery_get_photo_name(head, photo_aux.identifier,&photo_aux);
+          ret = gallery_get_photo_name(head, msg.identifier,&photo_aux);
           break;
 
         case 5:
-          photo_aux.type = gallery_get_photo(head,photo_aux.identifier, &photo_aux);
-          print_list(head);
+          ret = gallery_get_photo(head, msg.identifier, &photo_aux);
           break;
 
         default:
@@ -154,6 +173,16 @@ void * handle_client(void * arg){
           pthread_exit(NULL);
           break;
       }
+
+      if(msg.type <= 5 && msg.type != 2){
+        nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+        if( nbytes < 0 ){
+          perror("Write ret: ");
+          free(wa);
+          pthread_exit(NULL);
+        }
+      }
+
       pthread_mutex_unlock(&mutex);
 
     //send answer (echo)
