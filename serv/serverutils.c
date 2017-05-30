@@ -53,7 +53,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
 }
 
 // -1 -> error, 0 ->no photo 1->sucess
-int add_keyword(photo *head, uint32_t identifier, char *keyword_input){
+int add_keyword(photo *head, uint32_t identifier, char keyword_input[20]){
 
   //first search for photo
   if(head == NULL){
@@ -75,6 +75,7 @@ int add_keyword(photo *head, uint32_t identifier, char *keyword_input){
       }
 
       strcpy(new_keyword->word, keyword_input);
+      printf("adad %s\n", new_keyword->word);
       new_keyword->next = NULL;
 
       if(aux->key_header == NULL){
@@ -84,10 +85,13 @@ int add_keyword(photo *head, uint32_t identifier, char *keyword_input){
         keyword *aux_keyword = aux->key_header;
         while(aux_keyword != NULL){
           //keyword duplicates not allowed
-          if(strcmp(keyword_input, aux_keyword->word) == 0){
+          if(strcmp(new_keyword->word, aux_keyword->word) == 0){
             printf("keyword already in photo\n");
             free(new_keyword);
             return(-1);
+          }
+          if(aux_keyword->next == NULL){
+            break;
           }
           aux_keyword = aux_keyword->next;
         }
@@ -102,13 +106,12 @@ int add_keyword(photo *head, uint32_t identifier, char *keyword_input){
 }
 
 // -1 -> error, 0 ->no photos integer->number of photos count
-int get_photo_by_keyword(photo *head, struct identifier **ids, char *keyword_input){
+int get_photo_by_keyword(photo *head, struct identifier **ids, char keyword_input[MAX_WORD_SIZE]){
 
   if(head == NULL){
     printf("Empty list\n");
     return(0);
   }
-
   photo *aux = head;
   keyword *keyword_aux = NULL;
   struct identifier *aux_id = NULL;
@@ -118,6 +121,7 @@ int get_photo_by_keyword(photo *head, struct identifier **ids, char *keyword_inp
     keyword_aux = aux->key_header;
     while(keyword_aux != NULL){
       if(strcmp(keyword_input, keyword_aux->word) == 0){
+
         photo_count++;
         aux_id = (struct identifier *) calloc(1, sizeof(struct identifier));
         aux_id->id = aux->identifier;
@@ -196,7 +200,6 @@ int gallery_get_photo_name(photo *head, uint32_t id_photo, char file_name[MAX_WO
 }
 
 // -1-> error opening file 0->no photo 1->sucesssfull, change return or parameters to send photo
-//talvez o melhor seja receber a socket e enviar dentro da func
 int gallery_get_photo(photo* head, uint32_t id_photo, char *file_bytes, long *file_size){
 
   char file_name[MAX_WORD_SIZE];
@@ -229,7 +232,7 @@ int gallery_get_photo(photo* head, uint32_t id_photo, char *file_bytes, long *fi
       rewind(fd); //start reading file from the beginning
       fread(file_bytes, *file_size, 1, fd);
       fclose(fd);
-
+      printf("found\n");
       return(1);
     }
     aux = aux->next;

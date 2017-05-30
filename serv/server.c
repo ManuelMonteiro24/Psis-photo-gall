@@ -108,7 +108,7 @@ void * handle_client(void * arg){
       type 4: get photo name by id,
       type 5: ??
       */
-      pthread_mutex_lock(&mutex);
+
       switch(msg.type){
 
         case 0:
@@ -119,19 +119,37 @@ void * handle_client(void * arg){
             free(wa);
             pthread_exit(NULL);
           }
+          pthread_mutex_lock(&mutex);
           ret = add_photo(&head, msg.payload, file_bytes, nbytes);
+          pthread_mutex_unlock(&mutex);
+          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write ret: ");
+            free(wa);
+            pthread_exit(NULL);
+          }
           print_list(head);
           //UPDATE ALL OTHER PEERS
           break;
 
         case 1:
+          pthread_mutex_lock(&mutex);
           ret = add_keyword(head, msg.identifier, msg.payload);
+          pthread_mutex_unlock(&mutex);
+          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write ret: ");
+            free(wa);
+            pthread_exit(NULL);
+          }
           print_list(head);
           //UPDATE ALL OTHER PEERS
           break;
 
         case 2:
+          printf("case 2 %d\n", (int)sizeof(msg.payload));
           ret = get_photo_by_keyword(head, &ids, msg.payload);
+          printf("numb case 2 %d\n", ret);
           nbytes = write(newsockfd, &ret, sizeof(int)); //send number of found photos to client
           if( nbytes < 0 ){
             perror("Write ret type 2(1): ");
@@ -141,7 +159,7 @@ void * handle_client(void * arg){
           for(aux_id = rm = ids; aux_id != NULL; rm = aux_id, aux_id = aux_id->next){
               nbytes = write(newsockfd, &aux_id->id, sizeof(int)); //send return signal to client
               if( nbytes < 0 ){
-                perror("Write ret type 2(1): ");
+                perror("Write ret type 2(2): ");
                 free(wa);
                 pthread_exit(NULL);
               }
@@ -154,14 +172,27 @@ void * handle_client(void * arg){
           break;
 
         case 3:
+          pthread_mutex_lock(&mutex);
           ret = delete_photo(&head, msg.identifier);
+          pthread_mutex_unlock(&mutex);
+          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write ret: ");
+            free(wa);
+            pthread_exit(NULL);
+          }
           print_list(head);
           //SEND UPDATE TO THE NEXT PEER TO DO...
           break;
 
         case 4:
           ret = gallery_get_photo_name(head, msg.identifier, file_name);
-          //IF
+          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write ret 4: ");
+            free(wa);
+            pthread_exit(NULL);
+          }
           nbytes = write(newsockfd, file_name, MAX_WORD_SIZE); //send return signal to client
           if( nbytes < 0 ){
             perror("Write type 4 ");
@@ -173,23 +204,29 @@ void * handle_client(void * arg){
 
         case 5:
           ret = gallery_get_photo(head, msg.identifier, file_bytes, &file_size);
-          //SEND RET
-          //if(ret == 1){
-          nbytes = write(newsockfd, &file_size, sizeof(file_size)); //send return signal to client
+          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
           if( nbytes < 0 ){
-            perror("Write type 5 ");
+            perror("Write ret 4: ");
             free(wa);
             pthread_exit(NULL);
           }
-          printf("file_size %ld\n", file_size );
 
-          nbytes = write(newsockfd, file_bytes, file_size); //send return signal to client
-          if( nbytes < 0 ){
-            perror("Write type 5 ");
-            free(wa);
-            pthread_exit(NULL);
+          if(ret == 1){
+            nbytes = write(newsockfd, &file_size, sizeof(file_size)); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write type 5 ");
+              free(wa);
+              pthread_exit(NULL);
+            }
+            printf("file_size %ld\n", file_size );
+
+            nbytes = write(newsockfd, file_bytes, file_size); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write type 5 ");
+              free(wa);
+              pthread_exit(NULL);
+            }
           }
-          //}
 
           break;
 
@@ -202,25 +239,6 @@ void * handle_client(void * arg){
           break;
       }
 
-      if(msg.type <= 5 && msg.type != 2){
-        nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
-        if( nbytes < 0 ){
-          perror("Write ret: ");
-          free(wa);
-          pthread_exit(NULL);
-        }
-      }
-
-      pthread_mutex_unlock(&mutex);
-
-    //send answer (echo)
-  /*nbytes = write(newsockfd, &photo_aux, sizeof(photo));
-    if( nbytes< 0){
-      perror("Write: ");
-      free(wa);
-      pthread_exit(NULL);
-    }
-    printf("replying %d bytes message type:%d\n", nbytes, photo_aux.type);*/
   }
 
   // communicate to gateway to change state

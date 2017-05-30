@@ -204,7 +204,7 @@ int gallery_search_photo(int peer_socket, char * keyword, uint32_t **photos_id){
          perror("Read: ");
          return(-1);
        }
-
+       printf("numb: %d\n", photosNumb);
        if(photosNumb != 0){
          *photos_id = (uint32_t *) calloc(photosNumb, sizeof(int));
          for(it = 0; it < photosNumb; it++){
@@ -237,14 +237,17 @@ int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name
   }
   printf("sent %d %d\n", nbytes, msg.type);
 
-  *photo_name = (char *) calloc(MAX_WORD_SIZE, sizeof(char));
-  nbytes = read(peer_socket, *photo_name, MAX_WORD_SIZE);
+  nbytes = read(peer_socket, &ret, 4);
   if(nbytes < 0){
     perror("Read: ");
     return(-1);
   }
 
-  nbytes = read(peer_socket, &ret, 4);
+  if(ret != 1)
+    return ret;
+
+  *photo_name = (char *) calloc(MAX_WORD_SIZE, sizeof(char));
+  nbytes = read(peer_socket, *photo_name, MAX_WORD_SIZE);
   if(nbytes < 0){
     perror("Read: ");
     return(-1);
@@ -272,6 +275,16 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
     return(-1);
   }
 
+  nbytes = read(peer_socket, &ret, 4);
+  if(nbytes < 0){
+    perror("Read: ");
+    return(-1);
+  }
+
+  if(ret != 1){
+    printf("dif 1\n");
+    return ret;
+  }
   /* receive message with photo size*/
   nbytes = read(peer_socket, &file_size, sizeof(file_size));
   if(nbytes< 0){
@@ -299,14 +312,6 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   printf("bytes written: %d\n", nbytes);
   fwrite(file_bytes, nbytes, 1, new_file);
   fclose(new_file);
-
-
-
-  nbytes = read(peer_socket, &ret, 4);
-  if(nbytes < 0){
-    perror("Read: ");
-    return(-1);
-  }
 
   return ret;
 }

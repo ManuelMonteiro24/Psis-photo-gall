@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]){
 
-    char buffer[BUFFERSIZE], aux[BUFFERSIZE];
+    char buffer[BUFFERSIZE], aux[MAX_WORD_SIZE];
     int ret_aux, it;
 
     if (argc < 3) {
@@ -59,18 +59,17 @@ int main(int argc, char *argv[]){
 
     printf("Search by keyword: \n");
     fgets(buffer, BUFFERSIZE, stdin);
-
-    int photo_count = gallery_search_photo(sock_fd, buffer, &photos_id);
+    sscanf(buffer, "%s", aux);
+    int photo_count = gallery_search_photo(sock_fd, aux, &photos_id);
     if(photo_count == -1){
       close(sock_fd);
       fprintf(stderr,"ERROR: invalid arguments, network problem or memory problem\n");
       exit(1);
     }else if(photo_count == 0){
-      printf("  No photo in the server with that keyword\n");
+      printf("No photo in the server with that keyword\n");
     }else{
       printf("Number of photos with that keyword: %d\n", photo_count);
-      printf("Photo identifiers: \n");
-
+      printf("Photo identifiers:\n");
       //print photo_id TO CHECK...
       for(it = 0;it < photo_count; it++){
         printf("%d\n", photos_id[it]);
@@ -79,7 +78,7 @@ int main(int argc, char *argv[]){
 
     // gallery_get_photo_name example
 
-    char *photo_name;
+  /*  char *photo_name;
     printf("Insert id of photo to get name: \n");
     fgets(buffer, BUFFERSIZE, stdin);
     if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
@@ -109,7 +108,7 @@ int main(int argc, char *argv[]){
       }else{
         printf("Remove sucessfull\n");
       }
-    }
+    }*/
     // gallery_get_photo example
 
     printf("Insert name of file to receive the downloaded photo and photo id to download: \n");
@@ -120,7 +119,7 @@ int main(int argc, char *argv[]){
       fgets(buffer, BUFFERSIZE, stdin);
     }
 
-    ret_aux = gallery_get_photo(sock_fd, photo_id, buffer);
+    ret_aux = gallery_get_photo(sock_fd, photo_id, aux);
     if(ret_aux == -1){
       close(sock_fd);
       fprintf(stderr,"Error Ocurred (invalid arguments, network problem or memory problem)\n");
