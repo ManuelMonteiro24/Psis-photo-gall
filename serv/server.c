@@ -69,6 +69,7 @@ void * handle_client(void * arg){
   struct photo photo_aux;
   Message msg;
   char file_bytes[MAX_FILE_SIZE], file_name[MAX_WORD_SIZE];
+  long file_size;
   struct identifier *ids, *aux_id, *rm;
   ids = aux_id = NULL;
 
@@ -160,6 +161,7 @@ void * handle_client(void * arg){
 
         case 4:
           ret = gallery_get_photo_name(head, msg.identifier, file_name);
+          //IF
           nbytes = write(newsockfd, file_name, MAX_WORD_SIZE); //send return signal to client
           if( nbytes < 0 ){
             perror("Write type 4 ");
@@ -170,7 +172,25 @@ void * handle_client(void * arg){
           break;
 
         case 5:
-          ret = gallery_get_photo(head, msg.identifier, &photo_aux);
+          ret = gallery_get_photo(head, msg.identifier, file_bytes, &file_size);
+          //SEND RET
+          //if(ret == 1){
+          nbytes = write(newsockfd, &file_size, sizeof(file_size)); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write type 5 ");
+            free(wa);
+            pthread_exit(NULL);
+          }
+          printf("file_size %ld\n", file_size );
+
+          nbytes = write(newsockfd, file_bytes, file_size); //send return signal to client
+          if( nbytes < 0 ){
+            perror("Write type 5 ");
+            free(wa);
+            pthread_exit(NULL);
+          }
+          //}
+
           break;
 
         default:

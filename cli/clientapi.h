@@ -3,6 +3,7 @@
 
 #define BUFFERSIZE 100
 #define MAX_WORD_SIZE 20
+#define MAX_FILE_SIZE 100000
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,11 +25,11 @@ typedef struct message_gw{
 typedef struct message{
     int type;
     uint32_t identifier;
-    char payload[20];
+    char payload[MAX_WORD_SIZE];
 } Message;
 
 typedef struct keyword{
-  char name[20];
+  char name[MAX_WORD_SIZE];
   struct keyword *next;
 }keyword;
 
@@ -36,7 +37,7 @@ typedef struct keyword{
 typedef struct photo{
   int type; //-1-> disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
   uint32_t identifier;
-  char name[20];
+  char name[MAX_WORD_SIZE];
   char* photo_bytes;
   struct photo *next;
 }photo;

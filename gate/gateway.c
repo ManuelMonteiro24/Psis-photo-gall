@@ -77,7 +77,7 @@ void * peers_server(void * arg){
       ret_aux = insert_server(&head, auxm.address, auxm.port, &auxm, &auxm2);
 
       print_server_list(head);
-      printf("PORT %d\n", auxm.port);
+      //printf("PORT %d\n", auxm.port);
       //send answer back to the server that just register
       nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, (const struct sockaddr *) &peer_addr, sizeof(peer_addr));
       if( nbytes< 0) perror("Write: ");

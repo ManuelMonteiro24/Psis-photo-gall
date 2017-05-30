@@ -183,6 +183,7 @@ int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
 
 }
 
+//ERROR HERE OR ON gallery_add_keyword
 int gallery_search_photo(int peer_socket, char * keyword, uint32_t **photos_id){
 
        int nbytes, photosNumb, it;
@@ -238,7 +239,7 @@ int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name
 
   *photo_name = (char *) calloc(MAX_WORD_SIZE, sizeof(char));
   nbytes = read(peer_socket, *photo_name, MAX_WORD_SIZE);
-  if(nbytes< 0){
+  if(nbytes < 0){
     perror("Read: ");
     return(-1);
   }
@@ -255,48 +256,57 @@ int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name
 //returns 1-> photo downloaded sucesssfully 0->photo doenst exists -1->error
 int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
 
-  char buffer[BUFFERSIZE];
-  int nbytes;
-  struct photo photo_aux;
+  int nbytes, ret;
+  Message msg;
+  long file_size;
 
-  //send photo identifier
-  photo_aux.type = 5;
-  photo_aux.identifier = id_photo;
+  char file_bytes[MAX_FILE_SIZE]; //char type is 1 byte long
 
-  /* send message to do... */
-  nbytes = write(peer_socket, &photo_aux, sizeof(photo));
+  msg.type = 5;
+  msg.identifier = id_photo;
+
+  /* send message with identifier of photo to receive */
+  nbytes = write(peer_socket, &msg, sizeof(msg));
   if(nbytes< 0){
     perror("Write: ");
     return(-1);
   }
-  printf("sent %d %d\n", nbytes, photo_aux.type);
 
-  /* receive photo_name to do... */
-  nbytes = read(peer_socket, &photo_aux, sizeof(photo));
+  /* receive message with photo size*/
+  nbytes = read(peer_socket, &file_size, sizeof(file_size));
   if(nbytes< 0){
     perror("Read: ");
     return(-1);
   }
 
-  //for now just writing the name of the photo on the file
-  if(photo_aux.type == 1){
+  /* receive message with photo*/
+  nbytes = read(peer_socket, file_bytes, file_size);
+  if(nbytes< 0){
+    perror("Read: ");
+    return(-1);
+  }
+  printf("recv photo (%d bytes)\n", nbytes);
 
-    FILE *fptr;
-    fptr = fopen(file_name, "rb+");
-    if(fptr == NULL) //if file does not exist, create it, if it does let it be
-    {
-      fptr = fopen(file_name, "wb");
-      if(fptr == NULL){
-        perror("Photo file");
-        return(0);
-      }
-      //INSERT PHOTO DATA TO FILE TO DO...
-      fprintf(fptr, "Photo name: %s\n", photo_aux.name);
-      fclose(fptr);
-    }else{
-      printf("Warning, there is already a file with file_name, choose another name");
-    }
+  //generate file on disk to save photo data
+  FILE *new_file;
+  new_file = fopen(file_name, "w+");
+  if(new_file == NULL){
+    perror("RCV PHOTO: ");
+    return -1;
   }
 
-  return (photo_aux.type);
+  //file not receving bytes??
+  printf("bytes written: %d\n", nbytes);
+  fwrite(file_bytes, nbytes, 1, new_file);
+  fclose(new_file);
+
+
+
+  nbytes = read(peer_socket, &ret, 4);
+  if(nbytes < 0){
+    perror("Read: ");
+    return(-1);
+  }
+
+  return ret;
 }

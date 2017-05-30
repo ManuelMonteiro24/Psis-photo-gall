@@ -67,7 +67,7 @@ int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int get_photo_by_keyword(photo* head, struct identifier **ids, char *keyword);
 int delete_photo(photo** head, uint32_t identifier);
 int gallery_get_photo_name(photo* head, uint32_t id_photo, char file_name[MAX_WORD_SIZE]);
-int gallery_get_photo(photo* head, uint32_t id_photo, photo* photo_aux);
+int gallery_get_photo(photo* head, uint32_t id_photo, char *file_bytes, long * file_size);
 void print_list(photo * head);
 void gallery_clean_list(photo * head);
 void keyword_clean_list(keyword * head);

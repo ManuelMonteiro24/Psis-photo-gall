@@ -195,9 +195,12 @@ int gallery_get_photo_name(photo *head, uint32_t id_photo, char file_name[MAX_WO
   return(0);
 }
 
-// 0 ->no photo 1->sucesssfull, change return or parameters to send photo data to do...
+// -1-> error opening file 0->no photo 1->sucesssfull, change return or parameters to send photo
 //talvez o melhor seja receber a socket e enviar dentro da func
-int gallery_get_photo(photo* head,uint32_t id_photo, photo* photo_aux){
+int gallery_get_photo(photo* head, uint32_t id_photo, char *file_bytes, long *file_size){
+
+  char file_name[MAX_WORD_SIZE];
+  Message msg;
 
   if(head==NULL){
     printf("Empty list\n");
@@ -207,8 +210,26 @@ int gallery_get_photo(photo* head,uint32_t id_photo, photo* photo_aux){
   photo * aux = head;
 
   while(aux!=NULL){
-    if(aux->identifier== id_photo){
-      strcpy(photo_aux->name,aux->name);   //exemplo to modify TO DO
+    if(aux->identifier == id_photo){
+
+      sprintf(file_name, "%d", (int)id_photo);
+
+      FILE *fd = fopen(file_name,"r+");
+      if(fd == NULL){
+        perror("Photo file ");
+        return (-1);
+      }
+
+      fseek(fd, 0, SEEK_END); //set stream pointer @fd to end-of-file
+      *file_size = ftell(fd); //get fd current possition in stream
+      memset(file_bytes,0,MAX_FILE_SIZE);
+
+      msg.type = 0;
+      strcpy(msg.payload, file_name);
+      rewind(fd); //start reading file from the beginning
+      fread(file_bytes, *file_size, 1, fd);
+      fclose(fd);
+
       return(1);
     }
     aux = aux->next;

@@ -4,7 +4,7 @@
 
 int main(int argc, char *argv[]){
 
-    char buffer[BUFFERSIZE];
+    char buffer[BUFFERSIZE], aux[BUFFERSIZE];
     int ret_aux, it;
 
     if (argc < 3) {
@@ -34,10 +34,15 @@ int main(int argc, char *argv[]){
 
     //gallery_add_keyword example
 
-    printf("Insert keyword to insert to the photo just inserted: \n");
+    printf("Insert photo_id and keyword to insert to the photo: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
-    ret_aux =  gallery_add_keyword(sock_fd, photo_id, buffer);
+    while(2 != sscanf(buffer, "%d %s", (int*) &photo_id, aux)){
+      printf("ERROR: invalid input\n");
+      fgets(buffer, BUFFERSIZE, stdin);
+    }
+
+    ret_aux =  gallery_add_keyword(sock_fd, photo_id, aux);
     if(ret_aux == -1){
       close(sock_fd);
       fprintf(stderr,"ERROR: duplicates or memory\n");
@@ -50,7 +55,6 @@ int main(int argc, char *argv[]){
 
 
     //gallery_search_photo example
-
     uint32_t *photos_id;
 
     printf("Search by keyword: \n");
@@ -97,19 +101,24 @@ int main(int argc, char *argv[]){
     fgets(buffer, BUFFERSIZE, stdin);
     if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
       printf("ERROR: invalid input\n");
+    } else {
+      //gallery_delete_photo example
+      ret_aux = gallery_delete_photo(sock_fd, photo_id);
+      if(ret_aux == 0){
+        printf("Photo to delete not found\n");
+      }else{
+        printf("Remove sucessfull\n");
+      }
     }
-    //gallery_delete_photo example
-    ret_aux = gallery_delete_photo(sock_fd, photo_id);
-    if(ret_aux == 0){
-      printf("Photo to delete not found\n");
-    }else{
-      printf("Remove sucessfull\n");
-    }
-
     // gallery_get_photo example
-/*
-    printf("Insert name of file to receive the downloaded photo: \n");
+
+    printf("Insert name of file to receive the downloaded photo and photo id to download: \n");
     fgets(buffer, BUFFERSIZE, stdin);
+
+    while(2 != sscanf(buffer, "%s %d", aux, (int*) &photo_id)){
+      printf("ERROR: invalid input\n");
+      fgets(buffer, BUFFERSIZE, stdin);
+    }
 
     ret_aux = gallery_get_photo(sock_fd, photo_id, buffer);
     if(ret_aux == -1){
@@ -120,8 +129,7 @@ int main(int argc, char *argv[]){
       printf("No photo in the server with that identifier\n");
     }else{
       printf("Download sucesssfull photo saved in file: %s\n", buffer);
-    }*/
-
+    }
 
     if(gallery_disconnect(sock_fd) != 0){
       perror("On socket close ");
