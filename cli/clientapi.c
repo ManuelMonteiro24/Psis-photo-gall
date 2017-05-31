@@ -1,5 +1,16 @@
 #include "clientapi.h"
 
+/*
+int connection_try_counter;
+
+void handle_connection_timer (int signal){
+
+    if(signal == SIGALRM){
+      connection_try_counter++;
+    }
+}
+*/
+
 //-1 -> error 0 -> sucess
 int gallery_disconnect(int peer_socket){
   return close(peer_socket);
@@ -7,6 +18,21 @@ int gallery_disconnect(int peer_socket){
 
 //-1->error 0->no peer available int->return socket
 int gallery_connect(char * host, in_port_t port){
+
+  int auxflag;
+
+  /*
+  //connection timer signals initiation
+  connection_try_counter = 0;
+
+	struct sigaction sa;
+	sa.sa_handler = &handle_connection_timer;
+	sa.sa_flags = 0;
+	sigfillset(&sa.sa_mask);
+
+	//set first alarm clock 5 seconds
+	alarm(2);
+  */
 
   message_gw auxm;
 
@@ -35,6 +61,13 @@ int gallery_connect(char * host, in_port_t port){
     close(sock_gt);
     return(-1); //gateway cannot be accessed
   }
+
+  /*
+  //isto faz com que o tratamento do sigalaram seja != do defaults
+	if(sigaction(SIGALRM, &sa, 0) == -1){
+		perror("sigaction");
+	}
+  */
 
   //rcv response from gateway, what do do if doesnt recv response???
   nbytes = recv(sock_gt, &auxm, sizeof(struct message_gw), 0);
@@ -74,7 +107,6 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
 
   int nbytes;
   uint32_t id;
-  struct photo photo_aux;
   Message msg;
   char *file_bytes; //char type is 1 byte long
 
@@ -91,6 +123,8 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
 
   msg.type = 0;
   strcpy(msg.payload, file_name);
+  msg.identifier = 0;
+  msg.update = 0;
   rewind(fd); //start reading file from the beginning
   fread(file_bytes, file_size, 1, fd);
   fclose(fd);
@@ -122,7 +156,6 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
 int gallery_delete_photo(int peer_socket, uint32_t id_photo){
 
   int nbytes, ret;
-  struct photo photo_aux;
   Message msg;
 
   msg.type = 3;
@@ -151,7 +184,6 @@ int gallery_delete_photo(int peer_socket, uint32_t id_photo){
 int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
 
   int nbytes, ret;
-  struct photo photo_aux;
   Message msg;
 
   msg.type = 1;
@@ -216,7 +248,6 @@ int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name
 
   char buffer[BUFFERSIZE];
   int nbytes, ret;
-  struct photo photo_aux;
   Message msg;
 
   //send photo identifier
@@ -276,7 +307,7 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   if(ret != 1){
     return ret;
   }
-  
+
   /* receive message with photo size*/
   nbytes = read(peer_socket, &file_size, sizeof(file_size));
   if(nbytes< 0){

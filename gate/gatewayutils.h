@@ -1,6 +1,9 @@
 #ifndef GATEWAYUTILS
 #define GATEWAYUTILS
 
+#define MAX_FILE_SIZE 100000 //bytes
+#define MAX_WORD_SIZE 20 //bytes
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <stdlib.h>
@@ -18,24 +21,31 @@
 #include <pthread.h>
 
 
+typedef struct workerArgs{
+  int sock_fd;
+  struct sockaddr_in sender_addr;
+}workerArgs;
+
+typedef struct message{
+    int type;
+    uint32_t identifier;
+    char payload[MAX_WORD_SIZE];
+    int update;
+} Message;
+
 //serverlist
 typedef struct servernode{
   char address[20];
   int port;
   int available; //1 esta disponivel 0 nao esta disponivel
   struct servernode *next;
-  //pthread_mutex_t lock; for whatt''???'??'
 }servernode;
 
-//serialize data to do....
 typedef struct message_gw{
-   int type; //0->next peer
+   int type;
    char address[20];
    int port;
 } message_gw;
-
-servernode* create_server_list();
-
 
 int insert_server(servernode **head,char* address, int port, message_gw *auxm, message_gw *auxm2);
 
@@ -48,9 +58,5 @@ int find_server(servernode *head,message_gw* mssg);
 void print_server_list(servernode *head);
 
 void clean_server_list(servernode *head);
-/*
-void * client_server(void * arg);
 
-void * peers_server(void * arg);
-*/
 #endif

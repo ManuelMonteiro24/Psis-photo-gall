@@ -1,38 +1,53 @@
 #include "serverutils.h"
 
 //insert at the end of the list, 0-> error, integer ->sucesssfull
-uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_size){
+uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int update, char *file_bytes, int file_size){
 
   //generate random number for photo identifier
   int exists;
   photo *aux, *new_photo = (photo *) malloc(sizeof(photo));
   char file_id[10]; //CHANGE TO APPROPRIATE VALUE
+  uint32_t photo_id;
 
   time_t rawtime;
   struct tm *time_info;
 
-  time(&rawtime);
-  time_info = localtime(&rawtime);
-  srand((int) time_info->tm_sec*(int) pthread_self());
-  int random_number, photo_id;
-
-  //generate an exclusive photo id; must be different for all photos
-  do{
-    exists = 0;
-    random_number = rand() % 501;
+  if(update == 0){
+    time(&rawtime);
     time_info = localtime(&rawtime);
-    photo_id = ((uint32_t)pthread_self()*random_number)/(time_info->tm_sec*random_number*random_number);
+    srand((int) time_info->tm_sec*(int) pthread_self());
+    int random_number;
 
+    //generate an exclusive photo id; must be different for all photos
+    do{
+      exists = 0;
+      random_number = rand() % 501;
+      time_info = localtime(&rawtime);
+      photo_id = ((uint32_t)pthread_self()*random_number)/(time_info->tm_sec*random_number*random_number);
+
+      for(aux = *head; aux != NULL; aux = aux->next){
+        if(aux->identifier == photo_id){
+          exists = 1;
+          break;
+        }
+      }
+    } while(exists && photo_id == 0);
+
+  } else{
+    photo_id = identifier;
     for(aux = *head; aux != NULL; aux = aux->next){
       if(aux->identifier == photo_id){
         exists = 1;
         break;
       }
     }
-  } while(exists && photo_id == 0);
+    if(exists == 1){
+      return 0;
+    }
+  }
 
   //generate file on disk to save photo data
-  sprintf(file_id, "%d", photo_id);
+  sprintf(file_id, "%u", photo_id);
   FILE *new_file;
   new_file = fopen(file_id, "w+");
   if(new_file == NULL){
@@ -75,7 +90,6 @@ int add_keyword(photo *head, uint32_t identifier, char keyword_input[20]){
       }
 
       strcpy(new_keyword->word, keyword_input);
-      printf("adad %s\n", new_keyword->word);
       new_keyword->next = NULL;
 
       if(aux->key_header == NULL){
@@ -276,9 +290,12 @@ void keyword_clean_list(keyword * head){
 }
 
 void gallery_clean_list(photo* head){
+  char aux_str[MAX_WORD_SIZE];
   photo* aux = head, *aux1;
   while(aux !=NULL){
     aux1 = aux;
+    sprintf(aux_str, "%u", aux->identifier);
+    remove(aux_str);
     aux = aux->next;
     keyword_clean_list(aux1->key_header);
     free(aux1);

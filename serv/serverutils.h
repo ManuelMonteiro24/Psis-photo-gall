@@ -32,6 +32,7 @@ typedef struct message{
     int type;
     uint32_t identifier;
     char payload[MAX_WORD_SIZE];
+    int update;
 } Message;
 
 typedef struct photo{
@@ -48,7 +49,6 @@ typedef struct keyword{
   struct keyword *next;
 }keyword;
 
-//serialize data to do....
 typedef struct message_gw{
    int type;
    char address[20];
@@ -62,7 +62,7 @@ struct identifier{
 
 photo* create_photo_list();
 
-uint32_t add_photo(photo **head, char *name, char *file_bytes, int file_size);
+uint32_t add_photo(photo **head, char *name, uint32_t identifier, int update, char *file_bytes, int file_size);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int get_photo_by_keyword(photo* head, struct identifier **ids, char *keyword);
 int delete_photo(photo** head, uint32_t identifier);

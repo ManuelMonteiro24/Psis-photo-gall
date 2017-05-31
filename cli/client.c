@@ -111,7 +111,6 @@ int main(int argc, char *argv[]){
       }
     }
 
-
     // gallery_get_photo example
 
     printf("Insert name of file to receive the downloaded photo and photo id to download: \n");

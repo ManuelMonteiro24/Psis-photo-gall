@@ -14,10 +14,10 @@
 #include <errno.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <signal.h>
 
-//serialize data to do....
 typedef struct message_gw{
-   int type;
+   int type;  //-1-> disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
    char address[20];
    int port;
 } message_gw;
@@ -26,22 +26,8 @@ typedef struct message{
     int type;
     uint32_t identifier;
     char payload[MAX_WORD_SIZE];
+    int update;
 } Message;
-
-typedef struct keyword{
-  char name[MAX_WORD_SIZE];
-  struct keyword *next;
-}keyword;
-
-
-typedef struct photo{
-  int type; //-1-> disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photo
-  uint32_t identifier;
-  char name[MAX_WORD_SIZE];
-  char* photo_bytes;
-  struct photo *next;
-}photo;
-
 
 int gallery_connect(char * host, in_port_t port);
 uint32_t gallery_add_photo(int peer_socket, char *file_name);

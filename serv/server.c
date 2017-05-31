@@ -8,13 +8,11 @@ void my_handler(int sig){
 
 //gateway_addr shared by all threads
 struct sockaddr_in gateway_addr;
+struct sockaddr_in gateway_addr_sync;
+struct sockaddr_in gate_serv_addr;
 
-//Next peer scheme vars
-struct sockaddr_in next_peer_addr;
-socklen_t size_addr;
-
-//NOT USING RIGTH NOW!
-pthread_mutex_t next_peer_lock;
+//server to gateway socket TCP
+int sock_gate_peer;
 
 //Peer photo list thats going to be shared between the threads
 photo* head = NULL;
@@ -23,36 +21,7 @@ photo* head = NULL;
 // CHANGE TO a mutex lock in each struct of the list TO DO..
 pthread_mutex_t mutex;
 
-void * peers_sync(void * arg){
-
-  int sock_gt = *(int*) arg;
-
-  message_gw auxm;
-
-  int nbytes;
-
-  while(1){
-
-    //NOT WORKING AND WE SHOULD DISCUSS HOW WE GOING TO DO THIS, we bind a udp server for each peer???
-
-    nbytes = recv(sock_gt, &auxm, sizeof( struct message_gw),0);
-    if( nbytes< 0) perror("Receiving from gateway: ");
-    printf("received %d with address %s and port %d\n", nbytes , auxm.address, auxm.port);
-
-    //TO DO...
-    //trough this thread make the heartbeating connection to the gateway
-    //to check when if it is online
-    //through here made a send to another peer of all those threads that we doesnt have
-    //when he regists
-    //RCV PHOTOS OR PHOTO TO ADD UPLOAD OR DELETE FROM ANOTHER PEER
-
-    if(auxm.type == 0){
-      next_peer_addr.sin_addr.s_addr = inet_addr(auxm.address);
-      next_peer_addr.sin_port = htons(auxm.port);
-    }
-  }
-  //never goes here
-}
+pthread_mutex_t mutex_peers_socket;
 
 void * handle_client(void * arg){
 
@@ -61,7 +30,7 @@ void * handle_client(void * arg){
   wa = (struct workerArgs*) arg;
 
   message_gw auxm;
-  int nbytes, sock_gt, newsockfd;
+  int nbytes, sock_gt, newsockfd, err;
   uint32_t ret;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
@@ -95,7 +64,8 @@ void * handle_client(void * arg){
         free(wa);
         pthread_exit(NULL);
       } else if(nbytes == 0){
-        printf("Connection closed by the client..\n");
+
+        printf("Connection closed..\n");
         free(wa);
         pthread_exit(NULL);
       }
@@ -112,38 +82,44 @@ void * handle_client(void * arg){
       switch(msg.type){
 
         case 0:
-          nbytes = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
-          printf("received photo with %d bytes\n", nbytes);
-          if( nbytes < 0 ){
+          file_size = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
+          printf("msg id %d  msg up %d\n", msg.identifier, msg.update);
+          printf("received photo with %ld bytes\n", file_size);
+          if( file_size < 0 ){
             perror("Read: ");
             free(wa);
             pthread_exit(NULL);
           }
+
           pthread_mutex_lock(&mutex);
-          ret = add_photo(&head, msg.payload, file_bytes, nbytes);
+          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
           pthread_mutex_unlock(&mutex);
-          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
-          if( nbytes < 0 ){
-            perror("Write ret: ");
-            free(wa);
-            pthread_exit(NULL);
+
+          if(msg.update == 0){
+            nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write ret: ");
+              free(wa);
+              pthread_exit(NULL);
+            }
           }
           print_list(head);
-          //UPDATE ALL OTHER PEERS
           break;
 
         case 1:
           pthread_mutex_lock(&mutex);
           ret = add_keyword(head, msg.identifier, msg.payload);
           pthread_mutex_unlock(&mutex);
-          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
-          if( nbytes < 0 ){
-            perror("Write ret: ");
-            free(wa);
-            pthread_exit(NULL);
+          if(msg.update == 0){
+            nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write ret: ");
+              free(wa);
+              pthread_exit(NULL);
+            }
+
           }
           print_list(head);
-          //UPDATE ALL OTHER PEERS
           break;
 
         case 2:
@@ -157,15 +133,15 @@ void * handle_client(void * arg){
             pthread_exit(NULL);
           }
           for(aux_id = rm = ids; aux_id != NULL; rm = aux_id, aux_id = aux_id->next){
-              nbytes = write(newsockfd, &aux_id->id, sizeof(int)); //send return signal to client
-              if( nbytes < 0 ){
-                perror("Write ret type 2(2): ");
-                free(wa);
-                pthread_exit(NULL);
-              }
-              if(aux_id != ids){
-                free(rm);
-              }
+            nbytes = write(newsockfd, &aux_id->id, sizeof(int)); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write ret type 2(2): ");
+              free(wa);
+              pthread_exit(NULL);
+            }
+            if(aux_id != ids){
+              free(rm);
+            }
           }
           free(rm); //free last element
           ids = NULL;
@@ -175,14 +151,15 @@ void * handle_client(void * arg){
           pthread_mutex_lock(&mutex);
           ret = delete_photo(&head, msg.identifier);
           pthread_mutex_unlock(&mutex);
-          nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
-          if( nbytes < 0 ){
-            perror("Write ret: ");
-            free(wa);
-            pthread_exit(NULL);
+          if(msg.update == 0){
+            nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write ret: ");
+              free(wa);
+              pthread_exit(NULL);
+            }
           }
           print_list(head);
-          //SEND UPDATE TO THE NEXT PEER TO DO...
           break;
 
         case 4:
@@ -193,13 +170,16 @@ void * handle_client(void * arg){
             free(wa);
             pthread_exit(NULL);
           }
-          nbytes = write(newsockfd, file_name, MAX_WORD_SIZE); //send return signal to client
-          if( nbytes < 0 ){
-            perror("Write type 4 ");
-            free(wa);
-            pthread_exit(NULL);
+
+          if(ret == 1){
+            nbytes = write(newsockfd, file_name, MAX_WORD_SIZE); //send return signal to client
+            if( nbytes < 0 ){
+              perror("Write type 4 ");
+              free(wa);
+              pthread_exit(NULL);
+            }
+            memset(file_name, 0, MAX_WORD_SIZE);
           }
-          memset(file_name, 0, MAX_WORD_SIZE);
           break;
 
         case 5:
@@ -239,6 +219,40 @@ void * handle_client(void * arg){
           break;
       }
 
+      if((ret > 0) && (msg.type == 0 || msg.type == 1 || msg.type == 3) && msg.update == 0){
+
+          /* create socket  */
+          sock_gate_peer = socket(AF_INET, SOCK_STREAM,0);
+          if(sock_gate_peer == -1){
+            perror("socket: ");
+            exit(-1);
+          }
+
+          if(connect(sock_gate_peer, (struct sockaddr *) &gateway_addr_sync, sizeof(gateway_addr_sync)) < 0){
+            perror("Connect gateway: ");
+            close(sock_gate_peer);
+            pthread_exit(NULL);
+          }
+
+          msg.update = 1;
+          if(msg.type == 0){
+            msg.identifier = ret;
+          }
+          nbytes = write(sock_gate_peer, &msg, sizeof(msg));
+          if(nbytes < 0){
+            perror("Write: ");
+            pthread_exit(NULL);
+          }
+
+          if(msg.type == 0){
+            nbytes = write(sock_gate_peer, file_bytes, file_size);
+            if(nbytes< 0){
+              perror("Write: ");
+              pthread_exit(NULL);
+            }
+          }
+          close(sock_gate_peer);
+      }
   }
 
   // communicate to gateway to change state
@@ -262,12 +276,11 @@ void * handle_client(void * arg){
   printf("replying %d bytes message:%d\n", nbytes, photo_aux.type);
 
   printf("Exiting thread\n");
-  gallery_clean_list(head);
   free(wa);
   pthread_exit(NULL);
 }
 
-int main(int argc, char *argv[]){
+int main(int argc, char const *argv[]) {
 
     //signals
     struct sigaction sa;
@@ -312,11 +325,22 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
+    //contact with gateway pc
+    bzero((char *) &gate_serv_addr, sizeof(gate_serv_addr));
+    gate_serv_addr.sin_family = AF_INET;
+    gate_serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
+    gate_serv_addr.sin_port = htons(atoi(argv[2])+1);
+
     //contact with gateway
     bzero((char *) &gateway_addr, sizeof(gateway_addr));
     gateway_addr.sin_family = AF_INET;
     gateway_addr.sin_addr.s_addr = inet_addr(argv[3]);
     gateway_addr.sin_port = htons(atoi(argv[4]));
+
+    bzero((char *) &gateway_addr_sync, sizeof(gateway_addr_sync));
+    gateway_addr_sync.sin_family = AF_INET;
+    gateway_addr_sync.sin_addr.s_addr = inet_addr(argv[3]);
+    gateway_addr_sync.sin_port = htons(atoi(argv[4])+1);
 
     //server
     bzero((char *) &local_addr, sizeof(local_addr));
@@ -329,8 +353,11 @@ int main(int argc, char *argv[]){
       perror("bind: ");
       close(sock_gt);
       close(sock_fd);
+      close(sock_gate_peer);
       exit(-1);
     }
+    pthread_mutex_init(&mutex,NULL);
+    pthread_mutex_init(&mutex_peers_socket,NULL);
 
     //process message to gateway (register)
     auxm.type = 1;
@@ -340,35 +367,6 @@ int main(int argc, char *argv[]){
     //send checkin message to gateway
     nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
     if( nbytes < 0) perror("Sending to gateway: ");
-
-    nbytes = recv(sock_gt, &auxm, sizeof( struct message_gw),0);
-    if( nbytes< 0) perror("Receiving from gateway: ");
-    printf("received %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
-
-    /*
-    //SET NEXT PEER if it isnt peer online
-    if(auxm.port != 0){
-      bzero((char *) &next_peer_addr, sizeof(next_peer_addr));
-      next_peer_addr.sin_family = AF_INET;
-      next_peer_addr.sin_addr.s_addr = inet_addr(auxm.address);
-      next_peer_addr.sin_port = htons(auxm.port);
-    }
-    pthread_mutex_init(&next_peer_lock, NULL);
-
-
-    //Peers sync thread
-    if(pthread_create(&sync_thread, NULL, peers_sync, &sock_gt) != 0){
-      perror("Could not create thread");
-      close(newsockfd);
-      close(sock_gt);
-      close(sock_fd);
-      pthread_mutex_destroy(&next_peer_lock);
-      exit(-1);
-    }
-
-    //Initiate mutex that protects list
-    pthread_mutex_init(&mutex, NULL);
-    */
 
     listen(sock_fd,5);
     clilen = sizeof(client_addr);
@@ -396,7 +394,8 @@ int main(int argc, char *argv[]){
             nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
             if( nbytes < 0 ) perror("Sending to gateway: ");
             pthread_mutex_destroy(&mutex);
-            pthread_mutex_destroy(&next_peer_lock);
+            pthread_mutex_destroy(&mutex_peers_socket);
+            gallery_clean_list(head);
             close(sock_gt);
             close(sock_fd);
             exit(0);

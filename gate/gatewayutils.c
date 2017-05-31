@@ -158,6 +158,7 @@ int find_server(servernode *head, message_gw* mssg){
   return(-1);
 }
 
+
 void print_server_list(servernode *head){
   servernode * aux = head;
   printf("Server List:");

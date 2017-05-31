@@ -7,12 +7,124 @@ void my_handler(int sig){
 
 servernode* head = NULL;
 
-//only one mutex for all list now we only have problem in sync with the pointer
-//to head that can be changed inserting or deleting the first node
-//IS THIS THE BEST WAY??
 pthread_mutex_t mutex;
 
-//erro a passar pointer
+
+
+void * sync_peers(void * arg){
+
+  //get arguments
+  struct workerArgs *wa;
+  wa = (struct workerArgs*) arg;
+
+  int sock_fd = wa->sock_fd, file_size;
+  struct sockaddr_in sender_addr = wa-> sender_addr;
+  servernode *aux = head;
+  struct sockaddr_in peer_addr;
+  int nbytes, sock_peer;
+  char file_bytes[MAX_FILE_SIZE];
+
+  Message msg;
+  memset(&msg, -1, sizeof(msg));
+
+  pthread_detach(pthread_self());
+
+  if(head == NULL){
+    printf("Error on sync update_peers()\n");
+    pthread_exit(NULL);
+  }
+
+  nbytes = read(sock_fd, &msg, sizeof(msg));
+  if( nbytes < 0 ){
+    perror("Received message: ");
+    free(wa);
+    pthread_exit(NULL);
+  } else if(nbytes == 0){
+    printf("Connection closed by the peer..\n");
+    free(wa);
+    pthread_exit(NULL);
+  }
+
+  if(msg.type == 0){
+    file_size = read(sock_fd, file_bytes, MAX_FILE_SIZE); //read file
+    printf("received photo with %d bytes\n", nbytes);
+    if( nbytes < 0 ){
+      perror("Read: ");
+      free(wa);
+      pthread_exit(NULL);
+    }
+  }
+
+
+  while(aux != NULL){
+    printf("sending to peer addr %s port %d\nsender addr %s port %d", aux->address, aux->port, inet_ntoa(sender_addr.sin_addr), sender_addr.sin_port);
+    peer_addr.sin_family = AF_INET;
+    peer_addr.sin_addr.s_addr = inet_addr(aux->address);
+    peer_addr.sin_port = htons(aux->port);
+    sock_peer = socket(AF_INET, SOCK_STREAM, 0);
+    if(sock_peer == -1){
+      perror("socket: ");
+      pthread_exit(NULL);
+    }
+
+    if(connect(sock_peer,(struct sockaddr *) &peer_addr, sizeof(peer_addr)) < 0){
+      perror("Connect: ");
+      close(sock_peer);
+      pthread_exit(NULL);
+    }
+    nbytes = write(sock_peer, &msg, sizeof(msg));
+    if(nbytes< 0){
+      perror("Write: ");
+      pthread_exit(NULL);
+    }
+
+    if(msg.type == 0){
+      nbytes = write(sock_peer, file_bytes, file_size);
+      if(nbytes< 0){
+        perror("Write: ");
+        pthread_exit(NULL);
+      }
+    }
+    close(sock_peer);
+    aux = aux->next;
+  }
+  pthread_exit(NULL);
+}
+
+void * peers_server_sync(void * arg){
+
+  //get arguments
+  int sock_fd = *(int*) arg;
+
+  struct sockaddr_in peer_addr;
+  int newsockfd;
+  workerArgs *wa;
+  pthread_t thread_id;
+
+  listen(sock_fd, 5);
+  socklen_t peer_len = sizeof(peer_addr);
+  while(1){
+
+      printf("accept sync\n");
+      newsockfd = accept(sock_fd, (struct sockaddr *) &peer_addr, &peer_len);
+      if(newsockfd < 0){
+        close(newsockfd);
+        perror("Accept: ");
+      }
+
+      wa = malloc(sizeof(struct workerArgs));
+      wa->sock_fd = newsockfd;
+      wa->sender_addr = peer_addr;
+
+      if(pthread_create(&thread_id, NULL, sync_peers, wa) != 0){
+        perror("Could not create thread");
+        close(newsockfd);
+        close(sock_fd);
+      }
+  }
+  pthread_exit(NULL);
+}
+
 void * client_server(void * arg){
 
   // get arguments
@@ -75,32 +187,8 @@ void * peers_server(void * arg){
 
       //auxm recv server after the register peer and auxm2 recv server before the register peer
       ret_aux = insert_server(&head, auxm.address, auxm.port, &auxm, &auxm2);
-
       print_server_list(head);
-      //printf("PORT %d\n", auxm.port);
-      //send answer back to the server that just register
-      nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, (const struct sockaddr *) &peer_addr, sizeof(peer_addr));
-      if( nbytes< 0) perror("Write: ");
-      printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
 
-       if(ret_aux == 1){
-        //if already is a server register
-        //send answer back to the server that is going to update the server that just register
-
-        auxm.type = 0;
-        strcpy(auxm.address, address_aux);
-        auxm.port = port_aux;
-
-        //contact with gateway
-        bzero((char *) &peer_addr, sizeof(peer_addr));
-        peer_addr.sin_family = AF_INET;
-        peer_addr.sin_addr.s_addr = inet_addr(auxm2.address);
-        peer_addr.sin_port = htons(auxm2.port);
-
-        nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
-        if( nbytes< 0) perror("Write: ");
-         printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
-       }
     }else if(auxm.type == 3){
       modifyavail_server(head,auxm.address, auxm.port, 0);
       print_server_list(head);
@@ -142,13 +230,12 @@ int main(int argc, char *argv[]){
 
     //var for sockets
     message_gw auxm;
-    struct sockaddr_in local_addr, local_addr0;
-    struct sockaddr_in client_addr;
+    struct sockaddr_in local_addr_client, local_addr_peers, local_addr_peers_sync;
     socklen_t size_addr;
     int nbytes, clilen, newsockfd, portno;
 
     //threads
-    pthread_t thread_id, thread_id0;
+    pthread_t thread_client, thread_peers, thread_peers_sync;
 
     if (argc < 5) {
          fprintf(stderr,"Usage: clientserveraddr clientserverport peersserveraddr peersserverport\n");
@@ -163,13 +250,13 @@ int main(int argc, char *argv[]){
     }
 
     //client server
-    bzero((char *) &local_addr, sizeof(local_addr));
+    bzero((char *) &local_addr_client, sizeof(local_addr_client));
     portno = atoi(argv[2]);
-    local_addr.sin_family = AF_INET;
-    local_addr.sin_addr.s_addr = inet_addr(argv[1]);
-    local_addr.sin_port = htons(portno);
+    local_addr_client.sin_family = AF_INET;
+    local_addr_client.sin_addr.s_addr = inet_addr(argv[1]);
+    local_addr_client.sin_port = htons(portno);
 
-    int err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
+    int err = bind(sock_fd, (struct sockaddr *)&local_addr_client, sizeof(local_addr_client));
     if(err == -1){
       perror("bind: ");
       close(sock_fd);
@@ -184,37 +271,69 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-
     //peers server
-    bzero((char *) &local_addr0, sizeof(local_addr0));
+    bzero((char *) &local_addr_peers, sizeof(local_addr_peers));
     portno = atoi(argv[4]);
-    local_addr0.sin_family = AF_INET;
-    local_addr0.sin_addr.s_addr = inet_addr(argv[3]);
-    local_addr0.sin_port = htons(portno);
+    local_addr_peers.sin_family = AF_INET;
+    local_addr_peers.sin_addr.s_addr = inet_addr(argv[3]);
+    local_addr_peers.sin_port = htons(portno);
 
-    err = bind(sock_peers, (struct sockaddr *)&local_addr0, sizeof(local_addr0));
+    err = bind(sock_peers, (struct sockaddr *)&local_addr_peers, sizeof(local_addr_peers));
     if(err == -1){
       perror("bind: ");
       close(sock_fd);
       close(sock_peers);
       exit(-1);
     }
+    //Socket peers sync
+
+    /* create socket  */
+    int sock_peers_sync = socket(AF_INET, SOCK_STREAM,0);
+    if(sock_fd == -1){
+      perror("socket: ");
+      exit(-1);
+    }
+
+    //server
+    bzero((char *) &local_addr_peers_sync, sizeof(local_addr_peers_sync));
+    local_addr_peers_sync.sin_family = AF_INET;
+    local_addr_peers_sync.sin_addr.s_addr = inet_addr(argv[3]);
+    local_addr_peers_sync.sin_port = htons(portno+1); //peers port + 1
+
+    err = bind(sock_peers_sync, (struct sockaddr *)&local_addr_peers_sync, sizeof(local_addr_peers_sync));
+    if(err == -1){
+      perror("bind: ");
+      close(sock_peers);
+      close(sock_fd);
+      close(sock_peers_sync);
+      exit(-1);
+    }
 
     //Initiate mutex that protects list
     pthread_mutex_init(&mutex, NULL);
 
-    if(pthread_create(&thread_id, NULL, client_server,(void*) &sock_fd) != 0){
+    if(pthread_create(&thread_client, NULL, client_server,(void*) &sock_fd) != 0){
       perror("Could not create clients thread");
       close(sock_fd);
       close(sock_peers);
+      close(sock_peers_sync);
       exit(-1);
     }
 
 
-    if(pthread_create(&thread_id0, NULL, peers_server,(void*) &sock_peers) != 0){
+    if(pthread_create(&thread_peers, NULL, peers_server,(void*) &sock_peers) != 0){
       perror("Could not create peers thread");
       close(sock_fd);
       close(sock_peers);
+      close(sock_peers_sync);
+      exit(-1);
+    }
+
+    if(pthread_create(&thread_peers_sync, NULL, peers_server_sync,(void*) &sock_peers_sync) != 0){
+      perror("Could not create peers thread");
+      close(sock_fd);
+      close(sock_peers);
+      close(sock_peers_sync);
       exit(-1);
     }
 
@@ -226,6 +345,7 @@ int main(int argc, char *argv[]){
         if(flag ==1){
           close(sock_fd);
           close(sock_peers);
+          close(sock_peers_sync);
           clean_server_list(head);
           pthread_mutex_destroy(&mutex);
           exit(0);
