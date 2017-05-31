@@ -5,6 +5,7 @@ int gallery_disconnect(int peer_socket){
   return close(peer_socket);
 }
 
+//-1->error 0->no peer available int->return socket
 int gallery_connect(char * host, in_port_t port){
 
   message_gw auxm;
@@ -42,7 +43,6 @@ int gallery_connect(char * host, in_port_t port){
     close(sock_gt);
     return(-1);
   }
-  printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
   close(sock_gt);
 
   //caso nao estiver nenhum server disponivel acabar aqui
@@ -53,7 +53,7 @@ int gallery_connect(char * host, in_port_t port){
   int sock_serv = socket(AF_INET, SOCK_STREAM, 0);
   if(sock_serv == -1){
     perror("socket: ");
-    return(0); //gateway cannot be accessed or -1?? cannot acess server
+    return(0);
   }
 
   // server
@@ -100,14 +100,12 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
     perror("Write: ");
     return(0);
   }
-  printf("sent add photo msg (%d bytes) type %d\n", nbytes, msg.type);
 
   nbytes = write(peer_socket, file_bytes, file_size);
   if(nbytes < 0){
     perror("Write: ");
     return(0);
   }
-  printf("sent photo (%d bytes) file_size %d\n", nbytes, (int) file_size);
 
   //receive photo identifier froms server
   nbytes = read(peer_socket, &id, sizeof(int));
@@ -115,7 +113,6 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
     perror("Read photo id: ");
     return(0);
   }
-  printf("photo id: %d\n", id);
 
   return id;
 
@@ -130,14 +127,13 @@ int gallery_delete_photo(int peer_socket, uint32_t id_photo){
 
   msg.type = 3;
   msg.identifier = id_photo;
-  printf("PHOTO TO DELETE ID %d\n", id_photo);
-  /* send message to do... */
+
+  /* send message*/
   nbytes = write(peer_socket, &msg, sizeof(msg));
   if(nbytes < 0){
     perror("Write: ");
     return(-1);
   }
-  printf("sent %d %d\n", nbytes, msg.type);
 
   /* receive confirmation to do... */
   nbytes = read(peer_socket, &ret, sizeof(int));
@@ -145,7 +141,6 @@ int gallery_delete_photo(int peer_socket, uint32_t id_photo){
     perror("Read keyword ret: ");
     return(-1);
   }
-  printf("received %d bytes : %d \n", nbytes, msg.type);
 
   // 1-> REmoval sucesssfull 0-> that photo isnt on the servers -1 -> error (duplicates)
   return ret;
@@ -163,15 +158,14 @@ int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
   msg.identifier = id_photo;
   strcpy(msg.payload, keyword);
 
-  /* send message to do... */
+  /* send message */
   nbytes = write(peer_socket, &msg, sizeof(msg));
   if(nbytes < 0){
     perror("Write add keyword: ");
     return(-1);
   }
-  printf("sent %d %d\n", nbytes, msg.type);
 
-  /* receive confirmation to do... */
+  /* receive confirmation */
   nbytes = read(peer_socket, &ret, sizeof(int));
   if(nbytes < 0){
     perror("Read : ");
@@ -183,7 +177,7 @@ int gallery_add_keyword(int peer_socket, uint32_t id_photo, char *keyword){
 
 }
 
-//ERROR HERE OR ON gallery_add_keyword
+//-1-> error 0-> no photo found integer-> number of photos found
 int gallery_search_photo(int peer_socket, char * keyword, uint32_t **photos_id){
 
        int nbytes, photosNumb, it;
@@ -196,7 +190,6 @@ int gallery_search_photo(int peer_socket, char * keyword, uint32_t **photos_id){
          perror("Write: ");
          return(-1);
        }
-       printf("sent %d %s\n", nbytes, msg.payload);
 
        //receive amount of photos matched with sent keyword
        nbytes = read(peer_socket, &photosNumb, sizeof(int));
@@ -204,7 +197,7 @@ int gallery_search_photo(int peer_socket, char * keyword, uint32_t **photos_id){
          perror("Read: ");
          return(-1);
        }
-       printf("numb: %d\n", photosNumb);
+
        if(photosNumb != 0){
          *photos_id = (uint32_t *) calloc(photosNumb, sizeof(int));
          for(it = 0; it < photosNumb; it++){
@@ -235,7 +228,6 @@ int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name
     perror("Write: ");
     return(-1);
   }
-  printf("sent %d %d\n", nbytes, msg.type);
 
   nbytes = read(peer_socket, &ret, 4);
   if(nbytes < 0){
@@ -282,9 +274,9 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   }
 
   if(ret != 1){
-    printf("dif 1\n");
     return ret;
   }
+  
   /* receive message with photo size*/
   nbytes = read(peer_socket, &file_size, sizeof(file_size));
   if(nbytes< 0){
@@ -298,7 +290,6 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
     perror("Read: ");
     return(-1);
   }
-  printf("recv photo (%d bytes)\n", nbytes);
 
   //generate file on disk to save photo data
   FILE *new_file;
@@ -308,8 +299,6 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
     return -1;
   }
 
-  //file not receving bytes??
-  printf("bytes written: %d\n", nbytes);
   fwrite(file_bytes, nbytes, 1, new_file);
   fclose(new_file);
 

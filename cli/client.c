@@ -30,6 +30,8 @@ int main(int argc, char *argv[]){
       close(sock_fd);
       fprintf(stderr,"Photo insertion as failed!\n");
       exit(1);
+    }else{
+      printf("Photo_id from the added photo: %d\n", photo_id);
     }
 
     //gallery_add_keyword example
@@ -78,7 +80,7 @@ int main(int argc, char *argv[]){
 
     // gallery_get_photo_name example
 
-  /*  char *photo_name;
+    char *photo_name;
     printf("Insert id of photo to get name: \n");
     fgets(buffer, BUFFERSIZE, stdin);
     if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
@@ -93,7 +95,6 @@ int main(int argc, char *argv[]){
       printf("No photo in the server with that identifier\n");
     }else{
       printf("Name of photo found: %s\n", photo_name);
-
     }
 
     printf("Insert id of photo to delete: \n");
@@ -108,7 +109,9 @@ int main(int argc, char *argv[]){
       }else{
         printf("Remove sucessfull\n");
       }
-    }*/
+    }
+
+
     // gallery_get_photo example
 
     printf("Insert name of file to receive the downloaded photo and photo id to download: \n");
