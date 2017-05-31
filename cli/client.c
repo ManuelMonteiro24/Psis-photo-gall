@@ -31,7 +31,7 @@ int main(int argc, char *argv[]){
       fprintf(stderr,"Photo insertion as failed!\n");
       exit(1);
     }else{
-      printf("Photo_id from the added photo: %d\n", photo_id);
+      printf("Photo_id from the added photo: %u\n", photo_id);
     }
 
     //gallery_add_keyword example
@@ -39,7 +39,7 @@ int main(int argc, char *argv[]){
     printf("Insert photo_id and keyword to insert to the photo: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
-    while(2 != sscanf(buffer, "%d %s", (int*) &photo_id, aux)){
+    while(2 != sscanf(buffer, "%u %s", (uint32_t*) &photo_id, aux)){
       printf("ERROR: invalid input\n");
       fgets(buffer, BUFFERSIZE, stdin);
     }
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]){
       printf("Photo identifiers:\n");
       //print photo_id TO CHECK...
       for(it = 0;it < photo_count; it++){
-        printf("%d\n", photos_id[it]);
+        printf("%u\n", photos_id[it]);
       }
      }
 
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]){
     char *photo_name;
     printf("Insert id of photo to get name: \n");
     fgets(buffer, BUFFERSIZE, stdin);
-    if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
+    if(1 != sscanf(buffer, "%u", (uint32_t*) &photo_id)){
       printf("ERROR: invalid input\n");
     }
     ret_aux = gallery_get_photo_name(sock_fd, photo_id, &photo_name);
@@ -99,7 +99,7 @@ int main(int argc, char *argv[]){
 
     printf("Insert id of photo to delete: \n");
     fgets(buffer, BUFFERSIZE, stdin);
-    if(1 != sscanf(buffer, "%d", (int*) &photo_id)){
+    if(1 != sscanf(buffer, "%u", (uint32_t*) &photo_id)){
       printf("ERROR: invalid input\n");
     } else {
       //gallery_delete_photo example
@@ -117,7 +117,7 @@ int main(int argc, char *argv[]){
     printf("Insert name of file to receive the downloaded photo and photo id to download: \n");
     fgets(buffer, BUFFERSIZE, stdin);
 
-    while(2 != sscanf(buffer, "%s %d", aux, (int*) &photo_id)){
+    while(2 != sscanf(buffer, "%s %u", aux, (uint32_t*) &photo_id)){
       printf("ERROR: invalid input\n");
       fgets(buffer, BUFFERSIZE, stdin);
     }

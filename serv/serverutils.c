@@ -21,7 +21,7 @@ uint32_t add_photo(photo **head, char *file_name, char *file_bytes, int file_siz
     exists = 0;
     random_number = rand() % 501;
     time_info = localtime(&rawtime);
-    photo_id = ((int)pthread_self()*random_number)/(time_info->tm_sec*random_number*random_number);
+    photo_id = ((uint32_t)pthread_self()*random_number)/(time_info->tm_sec*random_number*random_number);
 
     for(aux = *head; aux != NULL; aux = aux->next){
       if(aux->identifier == photo_id){
