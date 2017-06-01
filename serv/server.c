@@ -39,7 +39,7 @@ void * handle_client(void * arg){
   struct photo photo_aux;
   Message msg;
   char file_bytes[MAX_FILE_SIZE], file_name[MAX_WORD_SIZE];
-  long file_size;
+  int file_size;
   struct identifier *ids, *aux_id, *rm;
   ids = aux_id = NULL;
   keyword *kws = NULL, *aux_kw;
@@ -59,6 +59,7 @@ void * handle_client(void * arg){
 
   while(1){
       // read message
+      printf("waiting for read\n");
       memset(&msg, -1, sizeof(msg));
       nbytes = read(newsockfd, &msg, sizeof(msg));
       if( nbytes < 0 ){
@@ -86,17 +87,22 @@ void * handle_client(void * arg){
         case 0:
           file_size = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
           printf("msg id %d  msg up %d\n", msg.identifier, msg.update);
-          printf("received photo with %ld bytes\n", file_size);
+          printf("received photo with %d bytes\n", file_size);
           if( file_size < 0 ){
             perror("Read: ");
             free(wa);
             pthread_exit(NULL);
           }
 
+          printf("shiasdasdasd\n");
           pthread_mutex_lock(&mutex);
-          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size, &numbPhotos);
+          printf("add photo antes");
+          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
+          if(ret > 0){
+            numbPhotos++;
+          }
+          printf("add photo sai");
           pthread_mutex_unlock(&mutex);
-
           if(msg.update == 0){
             nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
             if( nbytes < 0 ){
@@ -106,6 +112,7 @@ void * handle_client(void * arg){
             }
           }
           print_list(head);
+          printf("Number of photos: %d\n", numbPhotos);
           break;
 
         case 1:
@@ -200,7 +207,7 @@ void * handle_client(void * arg){
               free(wa);
               pthread_exit(NULL);
             }
-            printf("file_size %ld\n", file_size );
+            printf("file_size %d\n", file_size );
 
             nbytes = write(newsockfd, file_bytes, file_size); //send return signal to client
             if( nbytes < 0 ){
@@ -214,8 +221,11 @@ void * handle_client(void * arg){
 
         case 6:
           pthread_mutex_lock(&mutex);
-          send_database(newsockfd, head);
+          ret = send_database(newsockfd, head, numbPhotos);
+          getchar();
+          printf("DB SEND OUT\n");
           pthread_mutex_unlock(&mutex);
+          printf("DB SEND BREAK\n");
           break;
 
         default:
@@ -385,13 +395,13 @@ int main(int argc, char const *argv[]) {
         exit(-1);
       }
 
-      if(connect(updateSocket,(struct sockaddr *)&gate_serv_addr, sizeof(gate_serv_addr)) < 0){
+      if(connect(updateSocket,( struct sockaddr *) &gate_serv_addr, sizeof(gate_serv_addr)) < 0){
         perror("Connect update socket: ");
         close(updateSocket);
         return(0); //No peer available
       }
 
-      if(update_database(updateSocket, &head, &numbPhotos) != 1){
+      if((numbPhotos = update_database(updateSocket, &head)) == -1){
         printf("ERROR: database update\n");
         //send message to remove from gateway type 5
         auxm.type = 5;
@@ -408,6 +418,7 @@ int main(int argc, char const *argv[]) {
         exit(0);
       }
 
+      close(updateSocket);
     }
 
     listen(sock_fd,5);

@@ -21,7 +21,7 @@ case ${1} in
   ;;
 
 'serv' )
-  cd gate && make && \
+  cd serv && make && \
   cd ..
   ;;
 

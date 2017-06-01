@@ -167,7 +167,7 @@ void * peers_server(void * arg){
   struct sockaddr_in peer_addr;
   socklen_t size_addr;
 
-  message_gw auxm;
+  message_gw auxm, auxm2;
   int nbytes, port_aux, ret_aux;
   char address_aux[20];
 
@@ -184,10 +184,10 @@ void * peers_server(void * arg){
       //ADDRESS and port from the peer that just register
       strcpy(address_aux,auxm.address);
       port_aux = auxm.port;
-      if(find_server(head,&auxm) == -1){
-        auxm.type = 0; //first peer on list
+      if(find_server(head,&auxm2) == -1){
+        auxm2.type = 0; //first peer on list
       } else{
-        auxm.type = 1;
+        auxm2.type = 1;
       }
 
       //auxm recv server after the register peer and auxm2 recv server before the register peer
@@ -195,7 +195,7 @@ void * peers_server(void * arg){
 
       print_server_list(head);
 
-      nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
+      nbytes = sendto(sock_fd, &auxm2, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
       if( nbytes< 0) perror("Write: ");
        printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
 
