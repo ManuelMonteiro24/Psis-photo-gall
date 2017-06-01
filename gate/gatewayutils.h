@@ -47,9 +47,9 @@ typedef struct message_gw{
    int port;
 } message_gw;
 
-int insert_server(servernode **head,char* address, int port, message_gw *auxm, message_gw *auxm2);
+int insert_server(servernode **head,char* address, int port);
 
-int delete_server(servernode **head,char* address, int port, message_gw *auxm, message_gw *auxm2);
+int delete_server(servernode **head,char* address, int port);
 
 int modifyavail_server(servernode *head,char* address, int port, int newstate);
 

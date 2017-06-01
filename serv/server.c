@@ -1,4 +1,4 @@
-  #include "serverutils.h"
+#include "serverutils.h"
 
 //arg serveraddr(127.0.0.1) serverport(51717) gatewayaddress gatewayport
 volatile sig_atomic_t flag = 0;
@@ -13,6 +13,7 @@ struct sockaddr_in gate_serv_addr;
 
 //server to gateway socket TCP
 int sock_gate_peer;
+int numbPhotos;
 
 //Peer photo list thats going to be shared between the threads
 photo* head = NULL;
@@ -30,7 +31,7 @@ void * handle_client(void * arg){
   wa = (struct workerArgs*) arg;
 
   message_gw auxm;
-  int nbytes, sock_gt, newsockfd, err;
+  int nbytes, sock_gt, newsockfd, err, it;
   uint32_t ret;
   sock_gt = wa->gatesock;
   newsockfd = wa->clisock;
@@ -41,6 +42,7 @@ void * handle_client(void * arg){
   long file_size;
   struct identifier *ids, *aux_id, *rm;
   ids = aux_id = NULL;
+  keyword *kws = NULL, *aux_kw;
 
   pthread_detach(pthread_self());
 
@@ -92,7 +94,7 @@ void * handle_client(void * arg){
           }
 
           pthread_mutex_lock(&mutex);
-          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
+          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size, &numbPhotos);
           pthread_mutex_unlock(&mutex);
 
           if(msg.update == 0){
@@ -210,6 +212,12 @@ void * handle_client(void * arg){
 
           break;
 
+        case 6:
+          pthread_mutex_lock(&mutex);
+          send_database(newsockfd, head);
+          pthread_mutex_unlock(&mutex);
+          break;
+
         default:
           printf("ERROR: received message type matched by default\n");
           //ERROR ON EXIT TO RESOLVE
@@ -302,7 +310,7 @@ int main(int argc, char const *argv[]) {
     pthread_t thread_id, sync_thread;
     struct workerArgs *wa;
 
-    int nbytes, newsockfd, portno;
+    int nbytes, newsockfd, updateSocket, portno;
     unsigned int clilen;
 
     if (argc < 5) {
@@ -324,12 +332,6 @@ int main(int argc, char const *argv[]) {
       perror("socket: ");
       exit(-1);
     }
-
-    //contact with gateway pc
-    bzero((char *) &gate_serv_addr, sizeof(gate_serv_addr));
-    gate_serv_addr.sin_family = AF_INET;
-    gate_serv_addr.sin_addr.s_addr = inet_addr(argv[1]);
-    gate_serv_addr.sin_port = htons(atoi(argv[2])+1);
 
     //contact with gateway
     bzero((char *) &gateway_addr, sizeof(gateway_addr));
@@ -365,8 +367,48 @@ int main(int argc, char const *argv[]) {
     auxm.port = atoi(argv[2]);
 
     //send checkin message to gateway
-    nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
+    nbytes = sendto(sock_gt, &auxm, sizeof( message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
     if( nbytes < 0) perror("Sending to gateway: ");
+
+    nbytes = recv(sock_gt, &auxm, sizeof(message_gw),0);
+    if( nbytes < 0) perror("Recv from gateway: ");
+    if(auxm.type != 0){
+      //contact with gateway pc
+      bzero((char *) &gate_serv_addr, sizeof(gate_serv_addr));
+      gate_serv_addr.sin_family = AF_INET;
+      gate_serv_addr.sin_addr.s_addr = inet_addr(auxm.address);
+      gate_serv_addr.sin_port = htons(auxm.port);
+
+      updateSocket = socket(AF_INET, SOCK_STREAM,0);
+      if(updateSocket == -1){
+        perror("update socket: ");
+        exit(-1);
+      }
+
+      if(connect(updateSocket,(struct sockaddr *)&gate_serv_addr, sizeof(gate_serv_addr)) < 0){
+        perror("Connect update socket: ");
+        close(updateSocket);
+        return(0); //No peer available
+      }
+
+      if(update_database(updateSocket, &head, &numbPhotos) != 1){
+        printf("ERROR: database update\n");
+        //send message to remove from gateway type 5
+        auxm.type = 5;
+        strcpy(auxm.address, wa->address);
+        auxm.port = atoi(wa->port);
+        nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
+        if( nbytes < 0 ) perror("Sending to gateway: ");
+        pthread_mutex_destroy(&mutex);
+        pthread_mutex_destroy(&mutex_peers_socket);
+        gallery_clean_list(head);
+        close(sock_gt);
+        close(sock_fd);
+        close(updateSocket);
+        exit(0);
+      }
+
+    }
 
     listen(sock_fd,5);
     clilen = sizeof(client_addr);
@@ -386,7 +428,7 @@ int main(int argc, char const *argv[]) {
         strcpy(wa->port, argv[2]);
 
         //ctrl-c pressed!
-          if(flag ==1){
+          if(flag == 1){
             //send message to remove from gateway type 5
             auxm.type = 5;
             strcpy(auxm.address, wa->address);

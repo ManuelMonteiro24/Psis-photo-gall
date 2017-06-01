@@ -1,7 +1,7 @@
 #include "serverutils.h"
 
 //insert at the end of the list, 0-> error, integer ->sucesssfull
-uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int update, char *file_bytes, int file_size){
+uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int update, char *file_bytes, int file_size, int *numbPhotos){
 
   //generate random number for photo identifier
   int exists;
@@ -47,7 +47,7 @@ uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int updat
   }
 
   //generate file on disk to save photo data
-  sprintf(file_id, "%u", photo_id);
+  sprintf(file_id, "%d", photo_id);
   FILE *new_file;
   new_file = fopen(file_id, "w+");
   if(new_file == NULL){
@@ -61,9 +61,11 @@ uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int updat
   new_photo->identifier = photo_id;
   strcpy(new_photo->name, file_name);
   new_photo->key_header = NULL;
+  new_photo->numKw = 0;
   new_photo->next = *head;
 
   *head = new_photo; //insert in the beginning of the list
+  (*numbPhotos)++;
   return photo_id;
 }
 
@@ -110,6 +112,7 @@ int add_keyword(photo *head, uint32_t identifier, char keyword_input[20]){
           aux_keyword = aux_keyword->next;
         }
         aux_keyword->next = new_keyword;
+        aux->numKw++;
       }
       return(1);
     }
@@ -214,45 +217,159 @@ int gallery_get_photo_name(photo *head, uint32_t id_photo, char file_name[MAX_WO
 }
 
 // -1-> error opening file 0->no photo 1->sucesssfull, change return or parameters to send photo
-int gallery_get_photo(photo* head, uint32_t id_photo, char *file_bytes, long *file_size){
+int gallery_get_photo(photo *head, uint32_t id_photo, char *file_bytes, long *file_size){
 
   char file_name[MAX_WORD_SIZE];
   Message msg;
 
-  if(head==NULL){
+  if(head == NULL){
     printf("Empty list\n");
     return(0);
   }
 
   photo * aux = head;
 
-  while(aux!=NULL){
+  while(aux != NULL){
     if(aux->identifier == id_photo){
-
       sprintf(file_name, "%d", (int)id_photo);
-
-      FILE *fd = fopen(file_name,"r+");
-      if(fd == NULL){
-        perror("Photo file ");
-        return (-1);
-      }
-
-      fseek(fd, 0, SEEK_END); //set stream pointer @fd to end-of-file
-      *file_size = ftell(fd); //get fd current possition in stream
-      memset(file_bytes,0,MAX_FILE_SIZE);
-
+      read_file(file_name, file_bytes, file_size);
       msg.type = 0;
       strcpy(msg.payload, file_name);
-      rewind(fd); //start reading file from the beginning
-      fread(file_bytes, *file_size, 1, fd);
-      fclose(fd);
-      printf("found\n");
-      return(1);
+      return 1;
     }
     aux = aux->next;
   }
   return(0);
 
+}
+
+//-1->error ->1 sucess
+int read_file(char file_name[MAX_WORD_SIZE], char *file_bytes, long *file_size){
+
+  FILE *fd = fopen(file_name,"r+");
+  if(fd == NULL){
+    perror("Photo file ");
+    return (-1);
+  }
+
+  fseek(fd, 0, SEEK_END); //set stream pointer @fd to end-of-file
+  *file_size = ftell(fd); //get fd current possition in stream
+  memset(file_bytes,0,MAX_FILE_SIZE);
+
+  rewind(fd); //start reading file from the beginning
+  fread(file_bytes, *file_size, 1, fd);
+  fclose(fd);
+
+  return(1);
+}
+
+int update_database(int updateSocket, photo **head, int *numbPhotos){
+  Message msg;
+  int nbytes, file_size, numKw, it;
+  char file_bytes[MAX_FILE_SIZE], kw[MAX_FILE_SIZE];
+
+  msg.type = 6;
+  nbytes = write(updateSocket, &msg, sizeof(Message));
+  if(nbytes< 0){
+    perror("Write: ");
+    return -1;
+  }
+
+  for(;;){
+    nbytes = read(updateSocket, &msg, sizeof(Message));
+    if(nbytes< 0){
+      perror("Write: ");
+      return -1;
+    }
+
+    if(msg.type == -1){
+      break;
+    }
+
+    file_size = read(updateSocket, file_bytes, MAX_FILE_SIZE);
+    if(file_size< 0){
+      perror("Write: ");
+      return -1;
+    }
+    printf("received photo id %d name %s size %d\n", msg.identifier, msg. payload, file_size);
+    add_photo(head, msg.payload, msg.identifier, msg.update, file_bytes, file_size, &numbPhotos);
+    print_list(*head);
+
+    nbytes = read(updateSocket, &numKw, 4); //receive number of keywords to add
+    if(nbytes< 0){
+      perror("Read numKw ");
+      return -1;
+    }
+
+    printf("numKw %d\n", numKw);
+    for(it = 0; it < numKw; it++){
+      nbytes = read(updateSocket, kw, MAX_WORD_SIZE);
+
+      if(nbytes < 0){
+        perror("Read kw: ");
+        return -1;
+      }
+      printf("identifier kw: %d\n", msg.identifier);
+      add_keyword(*head, msg.identifier, kw);
+    }
+  }
+
+  return 1;
+}
+
+int send_database(int updateSocket, photo *head){
+
+  int nbytes;
+  photo *aux = head;
+  long file_size;
+  char file_bytes[MAX_WORD_SIZE], file_name[MAX_WORD_SIZE];
+  Message msg;
+
+  while(aux != NULL){
+    sprintf(file_name, "%d", aux->identifier);
+    read_file(file_name, file_bytes, &file_size);
+    msg.type = 6;
+    msg.identifier = aux->identifier;
+    memset(msg.payload,0,MAX_WORD_SIZE);
+    strcpy(msg.payload, aux->name);
+    msg.update = 1;
+
+    nbytes = write(updateSocket, &msg, sizeof(Message));
+    if(nbytes< 0){
+      perror("Write: ");
+      return -1;
+    }
+
+    nbytes = write(updateSocket, file_bytes, file_size);
+    if(nbytes< 0){
+      perror("Write: ");
+      return -1;
+    }
+    nbytes = write(updateSocket, &aux->numKw, 4);
+    if(nbytes< 0){
+      perror("Write: ");
+      return -1;
+    }
+    keyword *aux_keyword = aux->key_header;
+    while(aux_keyword != NULL){
+        nbytes = write(updateSocket, aux_keyword->word , MAX_WORD_SIZE);
+        if(nbytes< 0){
+          perror("Write: ");
+          return -1;
+        }
+        aux_keyword = aux_keyword->next;
+    }
+    aux = aux->next;
+  }
+
+  msg.type = -1; //stop receiving photos
+  nbytes = write(updateSocket, &msg , sizeof(msg));
+  if(nbytes< 0){
+    perror("Write: ");
+    return -1;
+  }
+
+  return 1;
 }
 
 //debug

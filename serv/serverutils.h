@@ -39,6 +39,7 @@ typedef struct photo{
   int type; // -1->disconnect 0->insert on list 1-> add keyword 2->search_by_keyword 3->delete photo 4->gallery_get_photo_name 5->gallery_get_photon
   uint32_t identifier;
   char name[MAX_WORD_SIZE];
+  int numKw;
   struct keyword * key_header;
   //falta binary data
   struct photo *next;
@@ -62,12 +63,15 @@ struct identifier{
 
 photo* create_photo_list();
 
-uint32_t add_photo(photo **head, char *name, uint32_t identifier, int update, char *file_bytes, int file_size);
+uint32_t add_photo(photo **head, char *name, uint32_t identifier, int update, char *file_bytes, int file_size, int *numbPhotos);
 int add_keyword(photo* head,uint32_t identifier, char *keyword);
 int get_photo_by_keyword(photo* head, struct identifier **ids, char *keyword);
 int delete_photo(photo** head, uint32_t identifier);
 int gallery_get_photo_name(photo* head, uint32_t id_photo, char file_name[MAX_WORD_SIZE]);
 int gallery_get_photo(photo* head, uint32_t id_photo, char *file_bytes, long * file_size);
+int send_database(int updateSocket, photo *head);
+int update_database(int updateSocket, photo **head, int *numbPhotos);
+int read_file(char file_name[MAX_WORD_SIZE], char *file_bytes, long *file_size);
 void print_list(photo * head);
 void gallery_clean_list(photo * head);
 void keyword_clean_list(keyword * head);

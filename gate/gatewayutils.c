@@ -3,7 +3,7 @@
 
 //-1-> error 0->sucess, first peer to register 1-> sucess more than 1 peer register
 //insert at the end of the list
-int insert_server(servernode **head, char* address, int port, message_gw *auxm, message_gw *auxm2){
+int insert_server(servernode **head, char* address, int port){
 
   servernode *new_server = (servernode*) malloc(sizeof(servernode));
   if(new_server == NULL){
@@ -18,8 +18,6 @@ int insert_server(servernode **head, char* address, int port, message_gw *auxm, 
 
   if(*head == NULL){
     *head = new_server;
-    auxm->type = 0;
-    auxm->port = 0; //means that doesnt have next peer
     return(0);
   }
 
@@ -36,20 +34,11 @@ int insert_server(servernode **head, char* address, int port, message_gw *auxm, 
     aux = aux->next;
   }
   aux->next = new_server;
-  //the next peer of the inserted one is the first of the list
-  auxm->type = 0;
-  strcpy(auxm->address, (*head)->address);
-  auxm->port = (*head)->port;
-
-  //information of the peer before of the inserted
-  auxm2->type = 0;
-  strcpy(auxm2->address, aux2->address);
-  auxm2->port = aux2->port;
   return(1);
 }
 
 //-1->error 0-> sucesssfull delete 1-> two or more peers on the list
-int delete_server(servernode **head, char* address, int port, message_gw *auxm, message_gw *auxm2){
+int delete_server(servernode **head, char* address, int port){
 
   servernode *aux = *head;
   servernode *aux0= *head;
@@ -64,27 +53,12 @@ int delete_server(servernode **head, char* address, int port, message_gw *auxm, 
     return(0);
   }
 
-
-
   while(aux !=NULL){
     if((strcmp(address, aux->address)==0) && (port == aux->port)){
       //server found
       aux0->next = aux->next;
-
-      //auxm
-      auxm->type = 0;
-      aux = aux->next;
-      //last node of list, and if we dont have only one node in list
-      if(aux == NULL && (*head)->next !=NULL){
-        strcpy(auxm->address,(*head)->address);
-        auxm->port = (*head)->port;
-      }
-
-      //auxm2
-      auxm2->type = 0;
-      strcpy(auxm2->address,aux0->address);
-      auxm2->port = aux0->port;
-      return(2);
+      free(aux);
+      return 0;
     }
     aux0 = aux;
     aux= aux->next;
@@ -120,7 +94,6 @@ int modifyavail_server(servernode *head, char* address, int port, int newstate){
 int find_server(servernode *head, message_gw* mssg){
 
   //get a server a give to client
-
   if(head == NULL){
     printf("Empty list\n");
     return(-1);
@@ -129,8 +102,6 @@ int find_server(servernode *head, message_gw* mssg){
   servernode *aux = head;
   int lowOcupServer = aux->available;
 
-  // This form is hack change to a better one TO DO...
-  // Ideia change to circular linked list???
   //search list for lower Ocup server
   while(aux != NULL){
     if(aux->available  < lowOcupServer){
@@ -152,9 +123,9 @@ int find_server(servernode *head, message_gw* mssg){
   }
 
   //No server available
-  mssg->type =2 ;
+  mssg->type = 2;
   strcpy(mssg->address,"");
-  mssg->port =0;
+  mssg->port = 0;
   return(-1);
 }
 
