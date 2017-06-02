@@ -1,14 +1,25 @@
 #include "gatewayutils.h"
 
-volatile sig_atomic_t flag = 0;
-void my_handler(int sig){
-  flag = 1;
-}
-
 servernode* head = NULL;
+
+int sock_fd, sock_peers, sock_peers_sync;
 
 pthread_mutex_t mutex;
 
+void exit_handler(int sig){
+    close(sock_fd);
+    close(sock_peers);
+    close(sock_peers_sync);
+    clean_server_list(head);
+    pthread_mutex_destroy(&mutex);
+    exit(0);
+}
+
+void alarm_handler(int sig){
+  alarm(30);
+  check_heartbeat(&head);
+  printf("Check heartbeat done\n");
+}
 
 
 void * sync_peers(void * arg){
@@ -30,7 +41,6 @@ void * sync_peers(void * arg){
   pthread_detach(pthread_self());
 
   if(head == NULL){
-    printf("Error on sync update_peers()\n");
     pthread_exit(NULL);
   }
 
@@ -163,6 +173,18 @@ void * peers_server(void * arg){
   // get arguments
   int sock_fd = *(int*)arg;
 
+  //alarm for heartbeat checking
+	struct sigaction sa;
+	sa.sa_handler = &alarm_handler;
+	sa.sa_flags = 0;
+	sigfillset(&sa.sa_mask);
+
+	//set first alarm clock 30 seconds
+	alarm(30);
+
+  if(sigaction(SIGALRM, &sa, 0) == -1){
+		perror("sigaction");
+	}
 
   struct sockaddr_in peer_addr;
   socklen_t size_addr;
@@ -180,7 +202,9 @@ void * peers_server(void * arg){
 
     //process message, process for server avalbility to do...
     pthread_mutex_lock(&mutex);
-    if(auxm.type == 1){
+    if(auxm.type == 0){
+      update_heartbeat(head,auxm.address, auxm.port);
+    }else if(auxm.type == 1){
       //ADDRESS and port from the peer that just register
       strcpy(address_aux,auxm.address);
       port_aux = auxm.port;
@@ -218,7 +242,7 @@ int main(int argc, char *argv[]){
 
     //signals
     struct sigaction sa;
-    sa.sa_handler = &my_handler;
+    sa.sa_handler = &exit_handler;
     sa.sa_flags = 0;
   	sigfillset(&sa.sa_mask);
     if( sigaction(SIGINT, &sa,0) == -1){
@@ -240,7 +264,7 @@ int main(int argc, char *argv[]){
      }
 
     /* create client server socket  */
-    int sock_fd = socket(AF_INET, SOCK_DGRAM,0);
+    sock_fd = socket(AF_INET, SOCK_DGRAM,0);
     if(sock_fd == -1){
       perror("socket: ");
       exit(-1);
@@ -261,7 +285,7 @@ int main(int argc, char *argv[]){
     }
 
     /* create peers server socket  */
-    int sock_peers = socket(AF_INET, SOCK_DGRAM,0);
+    sock_peers = socket(AF_INET, SOCK_DGRAM,0);
     if(sock_peers == -1){
       perror("socket: ");
       close(sock_fd);
@@ -285,7 +309,7 @@ int main(int argc, char *argv[]){
     //Socket peers sync
 
     /* create socket  */
-    int sock_peers_sync = socket(AF_INET, SOCK_STREAM,0);
+    sock_peers_sync = socket(AF_INET, SOCK_STREAM,0);
     if(sock_fd == -1){
       perror("socket: ");
       exit(-1);
@@ -334,19 +358,8 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-
     while(1){
-
-      //best way to shut down the threads ???? exit()=???
-      //ctrl-c pressed!
-        if(flag ==1){
-          close(sock_fd);
-          close(sock_peers);
-          close(sock_peers_sync);
-          clean_server_list(head);
-          pthread_mutex_destroy(&mutex);
-          exit(0);
-        }
+      //wait till crtl-c pressed
     }
     // never goes here!
     return 0;

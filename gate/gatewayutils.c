@@ -15,6 +15,7 @@ int insert_server(servernode **head, char* address, int port){
   new_server->port = port;
   new_server->next = NULL;
   new_server->available = 0;
+  new_server->heartbeat_flag = 1;
 
   if(*head == NULL){
     *head = new_server;
@@ -37,7 +38,50 @@ int insert_server(servernode **head, char* address, int port){
   return(1);
 }
 
-//-1->error 0-> sucesssfull delete 1-> two or more peers on the list
+//-1->nothing happen 0-> removal happen
+int check_heartbeat(servernode **head){
+
+  int ret = -1;
+
+   //Empty list
+   if(*head == NULL)
+     return(-1);
+
+   servernode *aux = *head;
+   while(aux != NULL){
+     if(aux->heartbeat_flag ==0){
+       ret = delete_server(head, aux->address, aux->port);
+       printf("Server %s %d removed (DIDNT SEND HEARTBEAT)\n", aux->address, aux->port);
+     }else{
+       aux->heartbeat_flag = 0;
+     }
+     aux = aux->next;
+   }
+
+   return(ret);
+
+}
+
+//-1 error 0 sucess
+int update_heartbeat(servernode *head, char * address, int port){
+
+  servernode *aux = head;
+
+  if(head == NULL)
+    return(-1);
+
+  while(aux !=NULL){
+    if(strcmp(address, aux->address)==0 && port == aux->port){
+      aux->heartbeat_flag = 1;
+      return(0);
+    }
+    aux = aux->next;
+  }
+  //no server found
+  return(-1);
+}
+
+//-1->error 0-> sucesssfull delete
 int delete_server(servernode **head, char* address, int port){
 
   servernode *aux = *head;

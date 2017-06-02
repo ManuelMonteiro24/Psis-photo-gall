@@ -1,10 +1,8 @@
 #include "serverutils.h"
 
 //arg serveraddr(127.0.0.1) serverport(51717) gatewayaddress gatewayport
-volatile sig_atomic_t flag = 0;
-void my_handler(int sig){
-  flag = 1;
-}
+
+
 
 //gateway_addr shared by all threads
 struct sockaddr_in gateway_addr;
@@ -14,6 +12,9 @@ struct sockaddr_in gate_serv_addr;
 //server to gateway socket TCP
 int sock_gate_peer;
 int numbPhotos;
+int sock_gt, sock_fd;
+int peer_port;
+char peer_addr[20];
 
 //Peer photo list thats going to be shared between the threads
 photo* head = NULL;
@@ -23,6 +24,64 @@ photo* head = NULL;
 pthread_mutex_t mutex;
 
 pthread_mutex_t mutex_peers_socket;
+
+//ctrl-c pressed!
+void exit_handler(int sig){
+
+  int nbytes;
+
+  message_gw auxm;
+
+  //send message to remove from gateway type 5
+  auxm.type = 5;
+  strcpy(auxm.address, peer_addr);
+  auxm.port = peer_port;
+  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
+  if( nbytes < 0 ) perror("Sending to gateway: ");
+  pthread_mutex_destroy(&mutex);
+  pthread_mutex_destroy(&mutex_peers_socket);
+  gallery_clean_list(head);
+  close(sock_gt);
+  close(sock_fd);
+  exit(0);
+}
+
+void handler_alarm(int sig){
+
+  message_gw auxm;
+
+  int nbytes;
+
+  //update heartbeat message
+  auxm.type = 0;
+  strcpy(auxm.address, peer_addr);
+  auxm.port = peer_port;
+  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
+  if( nbytes < 0 ) perror("Sending to gateway: ");
+  alarm(12);
+}
+
+
+void * handle_hearbeat(void * arg){
+
+  //alarm for heartbeat checking
+  struct sigaction sa_alarm;
+  sa_alarm.sa_handler = &handler_alarm;
+  sa_alarm.sa_flags = 0;
+  sigfillset(&sa_alarm.sa_mask);
+
+  //set first alarm clock 12 seconds
+  alarm(12);
+
+  if(sigaction(SIGALRM, &sa_alarm, 0) == -1){
+    perror("sigaction");
+  }
+  while(1){
+
+  }
+  pthread_exit(NULL);
+
+}
 
 void * handle_client(void * arg){
 
@@ -302,7 +361,7 @@ int main(int argc, char const *argv[]) {
 
     //signals
     struct sigaction sa;
-    sa.sa_handler = &my_handler;
+    sa.sa_handler = &exit_handler;
     sa.sa_flags = 0;
   	sigfillset(&sa.sa_mask);
     if( sigaction(SIGINT, &sa,0) == -1){
@@ -317,7 +376,7 @@ int main(int argc, char const *argv[]) {
     socklen_t size_addr;
 
     //var for threads
-    pthread_t thread_id, sync_thread;
+    pthread_t thread_id, sync_thread, thread_id_update;
     struct workerArgs *wa;
 
     int nbytes, newsockfd, updateSocket, portno;
@@ -329,7 +388,7 @@ int main(int argc, char const *argv[]) {
      }
 
     /* create socket  */
-    int sock_fd = socket(AF_INET, SOCK_STREAM,0);
+    sock_fd = socket(AF_INET, SOCK_STREAM,0);
 
     if(sock_fd == -1){
       perror("socket: ");
@@ -337,7 +396,7 @@ int main(int argc, char const *argv[]) {
     }
 
     /* create socket  */
-    int sock_gt = socket(AF_INET, SOCK_DGRAM,0);
+    sock_gt = socket(AF_INET, SOCK_DGRAM,0);
     if(sock_fd == -1){
       perror("socket: ");
       exit(-1);
@@ -359,6 +418,9 @@ int main(int argc, char const *argv[]) {
     local_addr.sin_family = AF_INET;
     local_addr.sin_addr.s_addr = inet_addr(argv[1]);
     local_addr.sin_port = htons(atoi(argv[2]));
+
+    strcpy(peer_addr, argv[1]);
+    peer_port =  atoi(argv[2]);
 
     int err = bind(sock_fd, (struct sockaddr *)&local_addr, sizeof(local_addr));
     if(err == -1){
@@ -421,48 +483,36 @@ int main(int argc, char const *argv[]) {
       close(updateSocket);
     }
 
+    //heartbeat thread
+    if(pthread_create(&thread_id_update, NULL, handle_hearbeat, NULL) != 0){
+      perror("Could not create heartbeathread");
+      close(sock_gt);
+      close(sock_fd);
+      exit(1);
+    }
+
     listen(sock_fd,5);
     clilen = sizeof(client_addr);
     while(1){
-
         printf("accept\n");
         newsockfd = accept(sock_fd, (struct sockaddr *) &client_addr, &clilen);
         if(newsockfd < 0){
           close(newsockfd);
           perror("Accept: ");
-        }
-
-        wa = malloc(sizeof(struct workerArgs));
-        wa->gatesock = sock_gt;
-        wa->clisock = newsockfd;
-        strcpy(wa->address, argv[1]);
-        strcpy(wa->port, argv[2]);
-
-        //ctrl-c pressed!
-          if(flag == 1){
-            //send message to remove from gateway type 5
-            auxm.type = 5;
-            strcpy(auxm.address, wa->address);
-            auxm.port = atoi(wa->port);
-            nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
-            if( nbytes < 0 ) perror("Sending to gateway: ");
-            pthread_mutex_destroy(&mutex);
-            pthread_mutex_destroy(&mutex_peers_socket);
-            gallery_clean_list(head);
-            close(sock_gt);
-            close(sock_fd);
-            exit(0);
-          }
-
+        }else{
+          wa = malloc(sizeof(struct workerArgs));
+          wa->gatesock = sock_gt;
+          wa->clisock = newsockfd;
+          strcpy(wa->address, argv[1]);
+          strcpy(wa->port, argv[2]);
 
           if(pthread_create(&thread_id, NULL, handle_client, wa) != 0){
             perror("Could not create thread");
             close(newsockfd);
-            close(sock_fd);
             free(wa);
           }
+        }
     }
     // never goes here
     return 0;
-
 }

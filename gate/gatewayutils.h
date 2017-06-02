@@ -38,11 +38,12 @@ typedef struct servernode{
   char address[20];
   int port;
   int available; //1 esta disponivel 0 nao esta disponivel
+  int heartbeat_flag;
   struct servernode *next;
 }servernode;
 
 typedef struct message_gw{
-   int type;
+   int type; //0-> heartbeat //1->inser ....
    char address[20];
    int port;
 } message_gw;
@@ -58,5 +59,9 @@ int find_server(servernode *head,message_gw* mssg);
 void print_server_list(servernode *head);
 
 void clean_server_list(servernode *head);
+
+int check_heartbeat(servernode **head);
+
+int update_heartbeat(servernode *head, char * address, int port);
 
 #endif
