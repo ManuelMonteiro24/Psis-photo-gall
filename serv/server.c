@@ -271,7 +271,7 @@ void * handle_client(void * arg){
 
         case 5:
           pthread_rwlock_rdlock(&rwlock);
-          ret = gallery_get_photo(head, msg.identifier, file_bytes, &file_size);
+          ret = gallery_get_photo(head, msg.identifier, save_bytes, &file_size);
           pthread_rwlock_unlock(&rwlock);
           nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
           if( nbytes < 0 ){
@@ -292,7 +292,7 @@ void * handle_client(void * arg){
               pthread_exit(NULL);
             }
 
-            nbytes = write(newsockfd, file_bytes, file_size); //send return signal to client
+            nbytes = write(newsockfd, save_bytes, file_size); //send return signal to client
             if( nbytes < 0 ){
               perror("Write type 5 ");
               free(wa);

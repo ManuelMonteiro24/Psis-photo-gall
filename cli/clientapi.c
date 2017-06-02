@@ -293,7 +293,8 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   Message msg;
   int file_size;
 
-  char file_bytes[MAX_FILE_SIZE]; //char type is 1 byte long
+  char *file_bytes = malloc(MAX_FILE_SIZE); //char type is 1 byte long
+  char *save_bytes = file_bytes;
 
   msg.type = 5;
   msg.identifier = id_photo;
@@ -302,16 +303,19 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   nbytes = write(peer_socket, &msg, sizeof(msg));
   if(nbytes< 0){
     perror("Write: ");
+    free(save_bytes);
     return(-1);
   }
 
   nbytes = read(peer_socket, &ret, 4);
   if(nbytes < 0){
     perror("Read ret: ");
+    free(save_bytes);
     return(-1);
   }
 
   if(ret != 1){
+    free(save_bytes);
     return ret;
   }
 
@@ -319,20 +323,25 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   nbytes = read(peer_socket, &file_size, 4);
   if(nbytes< 0){
     perror("Read file_size: ");
+    free(save_bytes);
     return(-1);
   }
 
   printf("file size: %d\n", file_size);
   /* receive message with photo*/
   fs_aux = file_size;
+  memset(save_bytes, 0, MAX_FILE_SIZE);
+  file_bytes = save_bytes;
   while(fs_aux > 0){
     nbytes = read(peer_socket, file_bytes, fs_aux);
     printf("nbytes %d\n", nbytes);
     if(nbytes < 0){
       perror("Read file_bytes: ");
+      free(save_bytes);
       return(-1);
     }
     fs_aux -= nbytes;
+    file_bytes += nbytes;
   }
 
   //generate file on disk to save photo data
@@ -340,11 +349,13 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   new_file = fopen(file_name, "w+");
   if(new_file == NULL){
     perror("RCV PHOTO: ");
+    free(save_bytes);
     return -1;
   }
 
-  fwrite(file_bytes, file_size, 1, new_file);
+  fwrite(save_bytes, file_size, 1, new_file);
   fclose(new_file);
 
+  free(save_bytes);
   return ret;
 }
