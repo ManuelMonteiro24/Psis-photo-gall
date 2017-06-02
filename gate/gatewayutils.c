@@ -136,7 +136,6 @@ int find_server(servernode *head, message_gw* mssg){
 
   //get a server a give to client
   if(head == NULL){
-    printf("Empty list\n");
     return(-1);
   }
 
@@ -173,7 +172,7 @@ int find_server(servernode *head, message_gw* mssg){
 
 void print_server_list(servernode *head){
   servernode * aux = head;
-  printf("Server List:");
+  printf("Server List:\n");
   if(aux == NULL){
     printf("Empty list\n");
   }else{

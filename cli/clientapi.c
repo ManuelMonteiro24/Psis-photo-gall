@@ -284,7 +284,7 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
 
   int nbytes, ret;
   Message msg;
-  long file_size;
+  int file_size;
 
   char file_bytes[MAX_FILE_SIZE]; //char type is 1 byte long
 
@@ -300,7 +300,7 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
 
   nbytes = read(peer_socket, &ret, 4);
   if(nbytes < 0){
-    perror("Read: ");
+    perror("Read ret: ");
     return(-1);
   }
 
@@ -309,16 +309,17 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   }
 
   /* receive message with photo size*/
-  nbytes = read(peer_socket, &file_size, sizeof(file_size));
+  nbytes = read(peer_socket, &file_size, 4);
   if(nbytes< 0){
-    perror("Read: ");
+    perror("Read file_size: ");
     return(-1);
   }
 
+  printf("file size: %d\n", file_size);
   /* receive message with photo*/
   nbytes = read(peer_socket, file_bytes, file_size);
-  if(nbytes< 0){
-    perror("Read: ");
+  if(nbytes < 0){
+    perror("Read file_bytes: ");
     return(-1);
   }
 

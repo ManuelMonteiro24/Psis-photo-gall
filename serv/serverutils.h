@@ -41,7 +41,6 @@ typedef struct photo{
   char name[MAX_WORD_SIZE];
   int numKw;
   struct keyword * key_header;
-  //falta binary data
   struct photo *next;
 }photo;
 

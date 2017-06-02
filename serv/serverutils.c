@@ -4,9 +4,9 @@
 uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int update, char *file_bytes, int file_size){
 
   //generate random number for photo identifier
-  int exists;
+  int exists, random_number;
   photo *aux, *new_photo = (photo *) malloc(sizeof(photo));
-  char file_id[10]; //CHANGE TO APPROPRIATE VALUE
+  char file_id[MAX_WORD_SIZE]; //CHANGE TO APPROPRIATE VALUE
   uint32_t photo_id;
 
   time_t rawtime;
@@ -15,15 +15,13 @@ uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int updat
   if(update == 0){
     time(&rawtime);
     time_info = localtime(&rawtime);
-    srand((int) time_info->tm_sec*(int) pthread_self());
-    int random_number;
+    srand( (int) time_info->tm_sec * (int) pthread_self());
 
     //generate an exclusive photo id; must be different for all photos
     do{
       exists = 0;
-      random_number = rand() % 501;
-      time_info = localtime(&rawtime);
-      photo_id = ((uint32_t)pthread_self()*random_number)/(time_info->tm_sec*random_number*random_number);
+      random_number = rand();
+      photo_id = (uint32_t) random_number % 5001;
 
       for(aux = *head; aux != NULL; aux = aux->next){
         if(aux->identifier == photo_id){
@@ -34,6 +32,7 @@ uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int updat
     } while(exists && photo_id == 0);
 
   } else{
+    exists = 0;
     photo_id = identifier;
     for(aux = *head; aux != NULL; aux = aux->next){
       if(aux->identifier == photo_id){
@@ -47,7 +46,7 @@ uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int updat
   }
 
   //generate file on disk to save photo data
-  sprintf(file_id, "%d", photo_id);
+  sprintf(file_id, "%u", photo_id);
   FILE *new_file;
   new_file = fopen(file_id, "w+");
   if(new_file == NULL){
@@ -101,7 +100,6 @@ int add_keyword(photo *head, uint32_t identifier, char keyword_input[20]){
         while(aux_keyword != NULL){
           //keyword duplicates not allowed
           if(strcmp(new_keyword->word, aux_keyword->word) == 0){
-            printf("keyword already in photo\n");
             free(new_keyword);
             return(-1);
           }
@@ -112,7 +110,6 @@ int add_keyword(photo *head, uint32_t identifier, char keyword_input[20]){
         }
         aux_keyword->next = new_keyword;
         aux->numKw = aux->numKw + 1;
-        printf("added kw; num kw %d for id %d\n", aux->numKw, aux->identifier);
       }
 
       return(1);
@@ -175,7 +172,7 @@ int delete_photo(photo** head, uint32_t identifier){
 
   if(identifier == (*head)->identifier){ //only case where *head needs to be updated
     *head = (*head)->next;
-    sprintf(file_name, "%d", (int) aux2->identifier);
+    sprintf(file_name, "%u", aux2->identifier);
     if(unlink(file_name) == -1){ //delete file from file system
       perror("Deleting file ");
     }
@@ -186,7 +183,7 @@ int delete_photo(photo** head, uint32_t identifier){
   for(aux1 = (*head)->next; aux1 != NULL; aux2 = aux1, aux1 = aux1->next){
     if(identifier == aux1->identifier){
       aux2->next = aux1->next;
-      sprintf(file_name, "%d", (int) aux1->identifier);
+      sprintf(file_name, "%u", aux1->identifier);
       if(unlink(file_name)  == -1){ //delete file from file system
         perror("Deleting file ");
       }
@@ -214,6 +211,7 @@ int gallery_get_photo_name(photo *head, uint32_t id_photo, char file_name[MAX_WO
     }
     aux = aux->next;
   }
+
   return(0);
 }
 
@@ -232,7 +230,7 @@ int gallery_get_photo(photo *head, uint32_t id_photo, char *file_bytes, int *fil
 
   while(aux != NULL){
     if(aux->identifier == id_photo){
-      sprintf(file_name, "%d", (int)id_photo);
+      sprintf(file_name, "%u", id_photo);
       read_file(file_name, file_bytes, file_size);
       msg.type = 0;
       strcpy(msg.payload, file_name);
@@ -255,7 +253,7 @@ int read_file(char file_name[MAX_WORD_SIZE], char *file_bytes, int *file_size){
 
   fseek(fd, 0, SEEK_END); //set stream pointer @fd to end-of-file
   *file_size = (int) ftell(fd); //get fd current possition in stream
-  memset(file_bytes,0,MAX_FILE_SIZE);
+  memset(file_bytes, 0, MAX_FILE_SIZE);
 
   rewind(fd); //start reading file from the beginning
   fread(file_bytes, *file_size, 1, fd);
@@ -337,7 +335,7 @@ int send_database(int updateSocket, photo *head, int numbPhotos){
 
   while(aux != NULL){
 
-    sprintf(file_name, "%d", aux->identifier);
+    sprintf(file_name, "%u", aux->identifier);
     read_file(file_name, file_bytes, &file_size);
     msg.type = file_size;
     msg.identifier = aux->identifier;

@@ -88,23 +88,22 @@ void * handle_client(void * arg){
   if(nbytes< 0){
     perror("Sending to gateway: ");
     free(wa);
+    close(newsockfd);
     pthread_exit(NULL);
   }
 
   while(1){
       // read message
-      printf("waiting for read\n");
       memset(&msg, -1, sizeof(msg));
+      ret = -2;
       nbytes = read(newsockfd, &msg, sizeof(msg));
-      if( nbytes < 0 ){
-        perror("Received message: ");
-        free(wa);
-        pthread_exit(NULL);
-      } else if(nbytes == 0){
-
-        printf("Connection closed..\n");
-        free(wa);
-        pthread_exit(NULL);
+      if( nbytes <= 0 ){
+        if(nbytes == 0){
+          printf("Connection closed..\n");
+        } else {
+          perror("Received message: ");
+        }
+        break;
       }
 
       /*Process message:
@@ -120,33 +119,29 @@ void * handle_client(void * arg){
 
         case 0:
           file_size = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
-          printf("msg id %d  msg up %d\n", msg.identifier, msg.update);
-          printf("received photo with %d bytes\n", file_size);
           if( file_size < 0 ){
             perror("Read: ");
             free(wa);
+            close(newsockfd);
             pthread_exit(NULL);
           }
 
-          printf("shiasdasdasd\n");
           pthread_mutex_lock(&mutex);
-          printf("add photo antes");
           ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
           if(ret > 0){
             numbPhotos++;
           }
-          printf("add photo sai");
           pthread_mutex_unlock(&mutex);
           if(msg.update == 0){
             nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
             if( nbytes < 0 ){
               perror("Write ret: ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
           }
           print_list(head);
-          printf("Number of photos: %d\n", numbPhotos);
           break;
 
         case 1:
@@ -158,6 +153,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret: ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
 
@@ -166,13 +162,12 @@ void * handle_client(void * arg){
           break;
 
         case 2:
-          printf("case 2 %d\n", (int)sizeof(msg.payload));
           ret = get_photo_by_keyword(head, &ids, msg.payload);
-          printf("numb case 2 %d\n", ret);
           nbytes = write(newsockfd, &ret, sizeof(int)); //send number of found photos to client
           if( nbytes < 0 ){
             perror("Write ret type 2(1): ");
             free(wa);
+            close(newsockfd);
             pthread_exit(NULL);
           }
           for(aux_id = rm = ids; aux_id != NULL; rm = aux_id, aux_id = aux_id->next){
@@ -180,6 +175,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret type 2(2): ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
             if(aux_id != ids){
@@ -199,6 +195,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret: ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
           }
@@ -211,6 +208,7 @@ void * handle_client(void * arg){
           if( nbytes < 0 ){
             perror("Write ret 4: ");
             free(wa);
+            close(newsockfd);
             pthread_exit(NULL);
           }
 
@@ -219,6 +217,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write type 4 ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
             memset(file_name, 0, MAX_WORD_SIZE);
@@ -231,6 +230,7 @@ void * handle_client(void * arg){
           if( nbytes < 0 ){
             perror("Write ret 4: ");
             free(wa);
+            close(newsockfd);
             pthread_exit(NULL);
           }
 
@@ -239,14 +239,15 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write type 5 ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
-            printf("file_size %d\n", file_size );
 
             nbytes = write(newsockfd, file_bytes, file_size); //send return signal to client
             if( nbytes < 0 ){
               perror("Write type 5 ");
               free(wa);
+              close(newsockfd);
               pthread_exit(NULL);
             }
           }
@@ -256,20 +257,14 @@ void * handle_client(void * arg){
         case 6:
           pthread_mutex_lock(&mutex);
           ret = send_database(newsockfd, head, numbPhotos);
-          getchar();
-          printf("DB SEND OUT\n");
           pthread_mutex_unlock(&mutex);
-          printf("DB SEND BREAK\n");
           break;
 
         default:
           printf("ERROR: received message type matched by default\n");
-          //ERROR ON EXIT TO RESOLVE
-          //disconnect client and close thread
-          free(wa);
-          pthread_exit(NULL);
           break;
       }
+      if(msg.type > 6) break; //exit while
 
       if((ret > 0) && (msg.type == 0 || msg.type == 1 || msg.type == 3) && msg.update == 0){
 
@@ -277,11 +272,13 @@ void * handle_client(void * arg){
           sock_gate_peer = socket(AF_INET, SOCK_STREAM,0);
           if(sock_gate_peer == -1){
             perror("socket: ");
-            exit(-1);
+            close(newsockfd);
+            pthread_exit(NULL);
           }
 
           if(connect(sock_gate_peer, (struct sockaddr *) &gateway_addr_sync, sizeof(gateway_addr_sync)) < 0){
             perror("Connect gateway: ");
+            close(newsockfd);
             close(sock_gate_peer);
             pthread_exit(NULL);
           }
@@ -293,6 +290,8 @@ void * handle_client(void * arg){
           nbytes = write(sock_gate_peer, &msg, sizeof(msg));
           if(nbytes < 0){
             perror("Write: ");
+            close(newsockfd);
+            close(sock_gate_peer);
             pthread_exit(NULL);
           }
 
@@ -300,6 +299,8 @@ void * handle_client(void * arg){
             nbytes = write(sock_gate_peer, file_bytes, file_size);
             if(nbytes< 0){
               perror("Write: ");
+              close(newsockfd);
+              close(sock_gate_peer);
               pthread_exit(NULL);
             }
           }
@@ -325,9 +326,7 @@ void * handle_client(void * arg){
     free(wa);
     pthread_exit(NULL);
   }
-  printf("replying %d bytes message:%d\n", nbytes, photo_aux.type);
 
-  printf("Exiting thread\n");
   free(wa);
   pthread_exit(NULL);
 }
@@ -467,7 +466,6 @@ int main(int argc, char const *argv[]) {
     listen(sock_fd,5);
     clilen = sizeof(client_addr);
     while(1){
-        printf("accept\n");
         newsockfd = accept(sock_fd, (struct sockaddr *) &client_addr, &clilen);
         if(newsockfd < 0){
           close(newsockfd);

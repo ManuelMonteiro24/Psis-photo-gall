@@ -4,9 +4,17 @@ servernode* head = NULL;
 
 int sock_client, sock_peers, sock_peers_sync;
 
+//threads
+pthread_t thread_client, thread_peers, thread_peers_sync;
+
 pthread_mutex_t mutex;
 
 void exit_handler(int sig){
+
+    pthread_cancel(thread_client);
+    pthread_cancel(thread_peers);
+    pthread_cancel(thread_peers_sync);
+
     close(sock_client);
     close(sock_peers);
     close(sock_peers_sync);
@@ -59,7 +67,6 @@ void * sync_peers(void * arg){
 
   if(msg.type == 0){
     file_size = read(sock_sync_peers_accepted, file_bytes, MAX_FILE_SIZE); //read file
-    printf("received photo with %d bytes\n", nbytes);
     if( nbytes < 0 ){
       perror("Read: ");
       free(wa);
@@ -69,7 +76,6 @@ void * sync_peers(void * arg){
   }
 
   while(aux != NULL){
-    printf("sending to peer addr %s port %d\nsender addr %s port %d", aux->address, aux->port, inet_ntoa(sender_addr.sin_addr), sender_addr.sin_port);
     peer_addr.sin_family = AF_INET;
     peer_addr.sin_addr.s_addr = inet_addr(aux->address);
     peer_addr.sin_port = htons(aux->port);
@@ -121,7 +127,6 @@ void * peers_server_sync(void * arg){
   socklen_t peer_len = sizeof(peer_addr);
   while(1){
 
-      printf("accept sync\n");
       newsockfd = accept(sock_peers_sync, (struct sockaddr *) &peer_addr, &peer_len);
       if(newsockfd < 0){
         close(newsockfd);
@@ -153,7 +158,6 @@ void * client_server(void * arg){
     size_addr = sizeof(struct sockaddr_in);
     nbytes = recvfrom(sock_client,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & client_addr, &size_addr);
     if( nbytes< 0) perror("Read: ");
-    printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
 
     //process message, process for server avalbility to do...
     if(auxm.type ==0){
@@ -164,7 +168,6 @@ void * client_server(void * arg){
       //send answer for clients
       nbytes = sendto(sock_client, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
       if( nbytes< 0) perror("Write: ");
-       printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
     }
 
   pthread_exit(NULL);
@@ -197,7 +200,6 @@ void * peers_server(void * arg){
     size_addr = sizeof(struct sockaddr_in);
     nbytes = recvfrom(sock_peers,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & peer_addr, &size_addr);
     if( nbytes< 0) perror("Read: ");
-    printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
 
     //process message, process for server avalbility to do...
     pthread_mutex_lock(&mutex);
@@ -220,7 +222,6 @@ void * peers_server(void * arg){
 
       nbytes = sendto(sock_peers, &auxm2, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
       if( nbytes< 0) perror("Write: ");
-       printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
 
     }else if(auxm.type == 3){
       modifyavail_server(head,auxm.address, auxm.port, 0);
@@ -254,8 +255,6 @@ int main(int argc, char *argv[]){
     socklen_t size_addr;
     int nbytes, clilen, newsockfd, portno;
 
-    //threads
-    pthread_t thread_client, thread_peers, thread_peers_sync;
 
     if (argc < 5) {
          fprintf(stderr,"Usage: clientserveraddr clientserverport peersserveraddr peersserverport\n");
