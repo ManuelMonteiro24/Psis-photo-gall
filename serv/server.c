@@ -324,12 +324,14 @@ void * handle_client(void * arg){
           sock_gate_peer = socket(AF_INET, SOCK_STREAM,0);
           if(sock_gate_peer == -1){
             perror("socket: ");
+            free(save_bytes);
             close(newsockfd);
             pthread_exit(NULL);
           }
 
           if(connect(sock_gate_peer, (struct sockaddr *) &gateway_addr_sync, sizeof(gateway_addr_sync)) < 0){
             perror("Connect gateway: ");
+            free(save_bytes);
             close(newsockfd);
             close(sock_gate_peer);
             pthread_exit(NULL);
@@ -343,6 +345,7 @@ void * handle_client(void * arg){
           nbytes = write(sock_gate_peer, &msg, sizeof(msg));
           if(nbytes < 0){
             perror("Write: ");
+            free(save_bytes);
             close(newsockfd);
             close(sock_gate_peer);
             pthread_exit(NULL);
@@ -352,14 +355,16 @@ void * handle_client(void * arg){
             nbytes = write(sock_gate_peer, &file_size, 4); //send file size
             if(nbytes < 0){
               perror("Write: ");
+              free(save_bytes);
               close(newsockfd);
               close(sock_gate_peer);
               pthread_exit(NULL);
             }
 
-            nbytes = write(sock_gate_peer, file_bytes, file_size);
+            nbytes = write(sock_gate_peer, save_bytes, file_size);
             if(nbytes< 0){
               perror("Write: ");
+              free(save_bytes);
               close(newsockfd);
               close(sock_gate_peer);
               pthread_exit(NULL);

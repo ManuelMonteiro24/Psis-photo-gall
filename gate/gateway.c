@@ -146,7 +146,7 @@ void * sync_peers(void * arg){
         free(save_bytes);
         pthread_exit(NULL);
       }
-      nbytes = write(sock_sync, file_bytes, file_size);
+      nbytes = write(sock_sync, save_bytes, file_size);
       if(nbytes< 0){
         perror("Write: ");
         close(sock_sync);
