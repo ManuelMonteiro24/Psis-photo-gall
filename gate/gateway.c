@@ -49,7 +49,7 @@ void * sync_peers(void * arg){
   struct sockaddr_in sender_addr = wa-> sender_addr;
   servernode *aux = head;
   struct sockaddr_in peer_addr;
-  int nbytes, sock_sync;
+  int nbytes, sock_sync, fs_aux;
   char file_bytes[MAX_FILE_SIZE];
 
   Message msg;
@@ -75,12 +75,24 @@ void * sync_peers(void * arg){
   }
 
   if(msg.type == 0){
-    file_size = read(sock_sync_peers_accepted, file_bytes, MAX_FILE_SIZE); //read file
+    nbytes = read(sock_sync_peers_accepted, &file_size, 4); //read file
     if( nbytes < 0 ){
-      perror("Read: ");
+      perror("Read file size: ");
       free(wa);
       close(sock_sync_peers_accepted);
       pthread_exit(NULL);
+    }
+
+    fs_aux = file_size;
+    while(fs_aux > 0){
+      nbytes = read(sock_sync_peers_accepted, file_bytes, fs_aux); //read file
+      if( nbytes < 0 ){
+        perror("Read: ");
+        free(wa);
+        close(sock_sync_peers_accepted);
+        pthread_exit(NULL);
+      }
+      fs_aux -= nbytes;
     }
   }
 
@@ -91,6 +103,7 @@ void * sync_peers(void * arg){
     sock_sync = socket(AF_INET, SOCK_STREAM, 0);
     if(sock_sync == -1){
       perror("socket: ");
+      free(wa);
       close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
@@ -99,6 +112,7 @@ void * sync_peers(void * arg){
       perror("Connect: ");
       close(sock_sync);
       close(sock_sync_peers_accepted);
+      free(wa);
       pthread_exit(NULL);
     }
     nbytes = write(sock_sync, &msg, sizeof(msg));
@@ -106,22 +120,35 @@ void * sync_peers(void * arg){
       perror("Write: ");
       close(sock_sync);
       close(sock_sync_peers_accepted);
+      free(wa);
       pthread_exit(NULL);
     }
 
     if(msg.type == 0){
+      nbytes = write(sock_sync, &file_size, 4);
+      if(nbytes< 0){
+        perror("Write: ");
+        close(sock_sync);
+        close(sock_sync_peers_accepted);
+        free(wa);
+        pthread_exit(NULL);
+      }
+      
       nbytes = write(sock_sync, file_bytes, file_size);
       if(nbytes< 0){
         perror("Write: ");
         close(sock_sync);
         close(sock_sync_peers_accepted);
+        free(wa);
         pthread_exit(NULL);
       }
     }
     aux = aux->next;
     close(sock_sync);
   }
+
   close(sock_sync_peers_accepted);
+  free(wa);
   pthread_exit(NULL);
 }
 

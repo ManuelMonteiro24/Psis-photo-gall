@@ -264,7 +264,7 @@ int read_file(char file_name[MAX_WORD_SIZE], char *file_bytes, int *file_size){
 
 int update_database(int updateSocket, photo **head){
   Message msg;
-  int nbytes, file_size, numKw, it, it1, numbPhotos;
+  int nbytes, file_size, fs_aux, numKw, it, it1, numbPhotos;
   char file_bytes[MAX_FILE_SIZE], kw[MAX_WORD_SIZE];
 
   msg.type = 6;
@@ -285,14 +285,18 @@ int update_database(int updateSocket, photo **head){
     memset(&msg, 0, sizeof(msg));
     nbytes = read(updateSocket, &msg, sizeof(msg));
     if(nbytes< 0){
-      perror("Write: ");
+      perror("Read msg: ");
       return -1;
     }
 
-    file_size = read(updateSocket, file_bytes, msg.type);
-    if(file_size< 0){
-      perror("Write: ");
-      return -1;
+    fs_aux = msg.type;
+    while(fs_aux > 0){
+      nbytes = read(updateSocket, file_bytes, fs_aux);
+      if(nbytes < 0){
+        perror("Read file_bytes: ");
+        return -1;
+      }
+      fs_aux -= nbytes;
     }
 
     add_photo(head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);

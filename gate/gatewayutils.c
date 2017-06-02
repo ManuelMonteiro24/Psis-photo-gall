@@ -23,7 +23,6 @@ int insert_server(servernode **head, char* address, int port){
   }
 
   servernode* aux = *head;
-  servernode* aux2 = *head;
   //1 server in the list case
   if(aux->port == port && strcmp(aux->address,address) == 0)
     return(-1);
@@ -31,7 +30,6 @@ int insert_server(servernode **head, char* address, int port){
   while( aux->next != NULL){
     if(aux->port == port && strcmp(aux->address,address) == 0)
       return(-1);
-    aux2 = aux;
     aux = aux->next;
   }
   aux->next = new_server;
@@ -89,7 +87,8 @@ int delete_server(servernode **head, char* address, int port){
   if(*head == NULL)
     return(-1);
 
-  if(((*head)->next ==NULL) && (strcmp(address, (*head)->address)==0) && (port == (*head)->port)){
+  if(((*head)->next == NULL) && (strcmp(address, (*head)->address)==0) && (port == (*head)->port)){
+    free(aux);
     *head=NULL;
     return(0);
   }

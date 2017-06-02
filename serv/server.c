@@ -73,7 +73,7 @@ void * handle_client(void * arg){
   struct photo photo_aux;
   Message msg;
   char file_bytes[MAX_FILE_SIZE], file_name[MAX_WORD_SIZE];
-  int file_size;
+  int file_size, fs_aux;
   struct identifier *ids, *aux_id, *rm;
   ids = aux_id = NULL;
   keyword *kws = NULL, *aux_kw;
@@ -118,12 +118,32 @@ void * handle_client(void * arg){
       switch(msg.type){
 
         case 0:
-          file_size = read(newsockfd, file_bytes, MAX_FILE_SIZE); //read file
-          if( file_size < 0 ){
+          nbytes = read(newsockfd, &file_size, 4); //read file
+          if( nbytes < 0 ){
             perror("Read: ");
             free(wa);
             close(newsockfd);
             pthread_exit(NULL);
+          }
+
+          if(msg.update == 0){
+            printf("file size from client: %d\n", file_size);
+          }
+
+          if(msg.update == 1){
+            printf("file size from gateway: %d\n", file_size);
+          }
+
+          fs_aux = file_size;
+          while(fs_aux > 0){
+            nbytes = read(newsockfd, file_bytes, fs_aux); //read file
+            if(nbytes < 0){
+              perror("Read: ");
+              free(wa);
+              close(newsockfd);
+              pthread_exit(NULL);
+            }
+            fs_aux -= nbytes;
           }
 
           pthread_rwlock_wrlock(&rwlock);
@@ -276,6 +296,8 @@ void * handle_client(void * arg){
           printf("ERROR: received message type matched by default\n");
           break;
       }
+
+
       if(msg.type > 6) break; //exit while
 
       if((ret > 0) && (msg.type == 0 || msg.type == 1 || msg.type == 3) && msg.update == 0){
@@ -299,6 +321,7 @@ void * handle_client(void * arg){
           if(msg.type == 0){
             msg.identifier = ret;
           }
+
           nbytes = write(sock_gate_peer, &msg, sizeof(msg));
           if(nbytes < 0){
             perror("Write: ");
@@ -308,6 +331,14 @@ void * handle_client(void * arg){
           }
 
           if(msg.type == 0){
+            nbytes = write(sock_gate_peer, &file_size, 4); //send file size
+            if(nbytes < 0){
+              perror("Write: ");
+              close(newsockfd);
+              close(sock_gate_peer);
+              pthread_exit(NULL);
+            }
+
             nbytes = write(sock_gate_peer, file_bytes, file_size);
             if(nbytes< 0){
               perror("Write: ");

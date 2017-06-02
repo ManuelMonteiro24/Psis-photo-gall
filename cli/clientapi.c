@@ -105,7 +105,7 @@ int gallery_connect(char * host, in_port_t port){
 
 uint32_t gallery_add_photo(int peer_socket, char *file_name){
 
-  int nbytes;
+  int nbytes, sfs;
   uint32_t id;
   Message msg;
   char *file_bytes; //char type is 1 byte long
@@ -130,6 +130,13 @@ uint32_t gallery_add_photo(int peer_socket, char *file_name){
   fclose(fd);
 
   nbytes = write(peer_socket, &msg, sizeof(msg));
+  if(nbytes< 0){
+    perror("Write: ");
+    return(0);
+  }
+
+  sfs = (int) file_size;
+  nbytes = write(peer_socket, &sfs, 4);
   if(nbytes< 0){
     perror("Write: ");
     return(0);
@@ -282,7 +289,7 @@ int gallery_get_photo_name(int peer_socket, uint32_t id_photo, char **photo_name
 //returns 1-> photo downloaded sucesssfully 0->photo doenst exists -1->error
 int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
 
-  int nbytes, ret;
+  int nbytes, ret, fs_aux;
   Message msg;
   int file_size;
 
@@ -317,10 +324,14 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
 
   printf("file size: %d\n", file_size);
   /* receive message with photo*/
-  nbytes = read(peer_socket, file_bytes, file_size);
-  if(nbytes < 0){
-    perror("Read file_bytes: ");
-    return(-1);
+  fs_aux = file_size;
+  while(fs_aux > 0){
+    nbytes = read(peer_socket, file_bytes, fs_aux);
+    if(nbytes < 0){
+      perror("Read file_bytes: ");
+      return(-1);
+    }
+    fs_aux -= nbytes;
   }
 
   //generate file on disk to save photo data
@@ -331,7 +342,7 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
     return -1;
   }
 
-  fwrite(file_bytes, nbytes, 1, new_file);
+  fwrite(file_bytes, file_size, 1, new_file);
   fclose(new_file);
 
   return ret;
