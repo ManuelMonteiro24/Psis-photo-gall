@@ -48,7 +48,7 @@ uint32_t add_photo(photo **head, char *file_name, uint32_t identifier, int updat
   //generate file on disk to save photo data
   sprintf(file_id, "%u", photo_id);
   FILE *new_file;
-  new_file = fopen(file_id, "w+");
+  new_file = fopen(file_id, "w");
   if(new_file == NULL){
     perror("ADD PHOTO: ");
     return -1;
@@ -289,9 +289,12 @@ int update_database(int updateSocket, photo **head){
       return -1;
     }
 
+    printf("FILE SIZE SEND DATABASE %d\n", msg.type );
+
     fs_aux = msg.type;
     while(fs_aux > 0){
       nbytes = read(updateSocket, file_bytes, fs_aux);
+      printf("NBYTES: %d\n", nbytes );
       if(nbytes < 0){
         perror("Read file_bytes: ");
         return -1;
@@ -299,7 +302,7 @@ int update_database(int updateSocket, photo **head){
       fs_aux -= nbytes;
     }
 
-    add_photo(head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
+    add_photo(head, msg.payload, msg.identifier, msg.update, file_bytes, msg.type);
 
     nbytes = read(updateSocket, &numKw, 4);
     if(nbytes< 0){
@@ -346,6 +349,8 @@ int send_database(int updateSocket, photo *head, int numbPhotos){
     memset(msg.payload,0,MAX_WORD_SIZE);
     strcpy(msg.payload, aux->name);
     msg.update = 1;
+
+    printf("FILE SIZE SEND DATABASE %d\n", file_size );
 
     nbytes = write(updateSocket, &msg, sizeof(Message));
     if(nbytes< 0){

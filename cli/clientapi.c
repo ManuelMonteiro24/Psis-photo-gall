@@ -327,6 +327,7 @@ int gallery_get_photo(int peer_socket, uint32_t id_photo, char *file_name){
   fs_aux = file_size;
   while(fs_aux > 0){
     nbytes = read(peer_socket, file_bytes, fs_aux);
+    printf("nbytes %d\n", nbytes);
     if(nbytes < 0){
       perror("Read file_bytes: ");
       return(-1);

@@ -133,7 +133,6 @@ void * sync_peers(void * arg){
         free(wa);
         pthread_exit(NULL);
       }
-      
       nbytes = write(sock_sync, file_bytes, file_size);
       if(nbytes< 0){
         perror("Write: ");
@@ -284,7 +283,7 @@ void * peers_server(void * arg){
       print_server_list(head);
       pthread_rwlock_unlock(&rwlock);
     }else{
-      pthread_rwlock_wrlock(&rwlock);
+      pthread_rwlock_wrlock(&rwlock); 
       delete_server(&head,auxm.address, auxm.port);
       pthread_rwlock_unlock(&rwlock);
 

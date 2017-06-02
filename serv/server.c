@@ -52,7 +52,7 @@ void * handle_hearbeat(void * arg){
     auxm.port = peer_port;
     nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
     if( nbytes < 0 ) perror("Sending to gateway: ");
-    sleep(12);
+    sleep(5);
   }
   pthread_exit(NULL);
 
