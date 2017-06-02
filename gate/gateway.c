@@ -7,7 +7,7 @@ int sock_client, sock_peers, sock_peers_sync;
 //threads
 pthread_t thread_client, thread_peers, thread_peers_sync;
 
-pthread_mutex_t mutex;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 void exit_handler(int sig){
 
@@ -18,16 +18,25 @@ void exit_handler(int sig){
     close(sock_client);
     close(sock_peers);
     close(sock_peers_sync);
+
+    pthread_rwlock_wrlock(&rwlock);
     clean_server_list(head);
-    pthread_mutex_destroy(&mutex);
+    pthread_rwlock_unlock(&rwlock);
+    pthread_rwlock_destroy(&rwlock);
     exit(0);
 }
 
 void alarm_handler(int sig){
   alarm(25);
+  pthread_rwlock_rdlock(&rwlock);
   check_heartbeat(&head);
+  pthread_rwlock_unlock(&rwlock);
+
   printf("Check heartbeat done\n");
+
+  pthread_rwlock_rdlock(&rwlock);
   print_server_list(head);
+  pthread_rwlock_unlock(&rwlock);
 }
 
 void * sync_peers(void * arg){
@@ -161,9 +170,9 @@ void * client_server(void * arg){
 
     //process message, process for server avalbility to do...
     if(auxm.type ==0){
-      pthread_mutex_lock(&mutex);
+      pthread_rwlock_rdlock(&rwlock);
       find_server(head,&auxm);
-      pthread_mutex_unlock(&mutex);
+      pthread_rwlock_unlock(&rwlock);
     }
       //send answer for clients
       nbytes = sendto(sock_client, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
@@ -202,38 +211,60 @@ void * peers_server(void * arg){
     if( nbytes< 0) perror("Read: ");
 
     //process message, process for server avalbility to do...
-    pthread_mutex_lock(&mutex);
+
     if(auxm.type == 0){
+      pthread_rwlock_wrlock(&rwlock);
       update_heartbeat(head,auxm.address, auxm.port);
+      pthread_rwlock_unlock(&rwlock);
     }else if(auxm.type == 1){
       //ADDRESS and port from the peer that just register
       strcpy(address_aux,auxm.address);
       port_aux = auxm.port;
+      pthread_rwlock_rdlock(&rwlock);
       if(find_server(head,&auxm2) == -1){
         auxm2.type = 0; //first peer on list
       } else{
         auxm2.type = 1;
       }
-
+      pthread_rwlock_unlock(&rwlock);
       //auxm recv server after the register peer and auxm2 recv server before the register peer
+      pthread_rwlock_wrlock(&rwlock);
       ret_aux = insert_server(&head, auxm.address, auxm.port);
+      pthread_rwlock_unlock(&rwlock);
 
+      pthread_rwlock_rdlock(&rwlock);
       print_server_list(head);
+      pthread_rwlock_unlock(&rwlock);
 
       nbytes = sendto(sock_peers, &auxm2, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
       if( nbytes< 0) perror("Write: ");
 
     }else if(auxm.type == 3){
+
+      pthread_rwlock_wrlock(&rwlock);
       modifyavail_server(head,auxm.address, auxm.port, 0);
+      pthread_rwlock_unlock(&rwlock);
+
+      pthread_rwlock_rdlock(&rwlock);
       print_server_list(head);
+      pthread_rwlock_unlock(&rwlock);
     }else if(auxm.type == 4){
+      pthread_rwlock_wrlock(&rwlock);
       modifyavail_server(head,auxm.address, auxm.port, 1);
+      pthread_rwlock_unlock(&rwlock);
+
+      pthread_rwlock_rdlock(&rwlock);
       print_server_list(head);
+      pthread_rwlock_unlock(&rwlock);
     }else{
+      pthread_rwlock_wrlock(&rwlock);
       delete_server(&head,auxm.address, auxm.port);
+      pthread_rwlock_unlock(&rwlock);
+
+      pthread_rwlock_rdlock(&rwlock);
       print_server_list(head);
+      pthread_rwlock_unlock(&rwlock);
     }
-    pthread_mutex_unlock(&mutex);
   }
   pthread_exit(NULL);
 }
@@ -328,9 +359,6 @@ int main(int argc, char *argv[]){
       exit(-1);
     }
 
-    //Initiate mutex that protects list
-    pthread_mutex_init(&mutex, NULL);
-
     if(pthread_create(&thread_client, NULL, client_server,NULL) != 0){
       perror("Could not create clients thread");
       close(sock_client);
@@ -338,7 +366,6 @@ int main(int argc, char *argv[]){
       close(sock_peers_sync);
       exit(-1);
     }
-
 
     if(pthread_create(&thread_peers, NULL, peers_server,NULL) != 0){
       perror("Could not create peers thread");

@@ -15,7 +15,7 @@ char peer_addr[20];
 //Peer photo list thats going to be shared between the threads
 photo* head = NULL;
 
-pthread_mutex_t mutex;
+pthread_rwlock_t rwlock = PTHREAD_RWLOCK_INITIALIZER;
 
 //ctrl-c pressed!
 void exit_handler(int sig){
@@ -30,7 +30,7 @@ void exit_handler(int sig){
   auxm.port = peer_port;
   nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
   if( nbytes < 0 ) perror("Sending to gateway: ");
-  pthread_mutex_destroy(&mutex);
+  pthread_rwlock_destroy(&rwlock);
   gallery_clean_list(head);
   close(sock_gt);
   close(sock_fd);
@@ -126,12 +126,12 @@ void * handle_client(void * arg){
             pthread_exit(NULL);
           }
 
-          pthread_mutex_lock(&mutex);
+          pthread_rwlock_wrlock(&rwlock);
           ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
           if(ret > 0){
             numbPhotos++;
           }
-          pthread_mutex_unlock(&mutex);
+          pthread_rwlock_unlock(&rwlock);
           if(msg.update == 0){
             nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
             if( nbytes < 0 ){
@@ -141,13 +141,15 @@ void * handle_client(void * arg){
               pthread_exit(NULL);
             }
           }
+          pthread_rwlock_rdlock(&rwlock);
           print_list(head);
+          pthread_rwlock_unlock(&rwlock);
           break;
 
         case 1:
-          pthread_mutex_lock(&mutex);
+          pthread_rwlock_wrlock(&rwlock);
           ret = add_keyword(head, msg.identifier, msg.payload);
-          pthread_mutex_unlock(&mutex);
+          pthread_rwlock_unlock(&rwlock);
           if(msg.update == 0){
             nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
             if( nbytes < 0 ){
@@ -158,11 +160,15 @@ void * handle_client(void * arg){
             }
 
           }
+          pthread_rwlock_rdlock(&rwlock);
           print_list(head);
+          pthread_rwlock_unlock(&rwlock);
           break;
 
         case 2:
+          pthread_rwlock_rdlock(&rwlock);
           ret = get_photo_by_keyword(head, &ids, msg.payload);
+          pthread_rwlock_unlock(&rwlock);
           nbytes = write(newsockfd, &ret, sizeof(int)); //send number of found photos to client
           if( nbytes < 0 ){
             perror("Write ret type 2(1): ");
@@ -187,9 +193,9 @@ void * handle_client(void * arg){
           break;
 
         case 3:
-          pthread_mutex_lock(&mutex);
+          pthread_rwlock_wrlock(&rwlock);
           ret = delete_photo(&head, msg.identifier);
-          pthread_mutex_unlock(&mutex);
+          pthread_rwlock_unlock(&rwlock);
           if(msg.update == 0){
             nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
             if( nbytes < 0 ){
@@ -199,11 +205,15 @@ void * handle_client(void * arg){
               pthread_exit(NULL);
             }
           }
+          pthread_rwlock_rdlock(&rwlock);
           print_list(head);
+          pthread_rwlock_unlock(&rwlock);
           break;
 
         case 4:
+          pthread_rwlock_rdlock(&rwlock);
           ret = gallery_get_photo_name(head, msg.identifier, file_name);
+          pthread_rwlock_unlock(&rwlock);
           nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
           if( nbytes < 0 ){
             perror("Write ret 4: ");
@@ -225,7 +235,9 @@ void * handle_client(void * arg){
           break;
 
         case 5:
+          pthread_rwlock_rdlock(&rwlock);
           ret = gallery_get_photo(head, msg.identifier, file_bytes, &file_size);
+          pthread_rwlock_unlock(&rwlock);
           nbytes = write(newsockfd, &ret, sizeof(int)); //send return signal to client
           if( nbytes < 0 ){
             perror("Write ret 4: ");
@@ -255,9 +267,9 @@ void * handle_client(void * arg){
           break;
 
         case 6:
-          pthread_mutex_lock(&mutex);
+          pthread_rwlock_rdlock(&rwlock);
           ret = send_database(newsockfd, head, numbPhotos);
-          pthread_mutex_unlock(&mutex);
+          pthread_rwlock_unlock(&rwlock);
           break;
 
         default:
@@ -404,7 +416,6 @@ int main(int argc, char const *argv[]) {
       close(sock_gate_peer);
       exit(-1);
     }
-    pthread_mutex_init(&mutex,NULL);
 
     //process message to gateway (register)
     auxm.type = 1;
@@ -444,8 +455,8 @@ int main(int argc, char const *argv[]) {
         auxm.port = atoi(wa->port);
         nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
         if( nbytes < 0 ) perror("Sending to gateway: ");
-        pthread_mutex_destroy(&mutex);
         gallery_clean_list(head);
+        pthread_rwlock_destroy(&rwlock);
         close(sock_gt);
         close(sock_fd);
         close(updateSocket);
