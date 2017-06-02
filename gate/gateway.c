@@ -2,12 +2,12 @@
 
 servernode* head = NULL;
 
-int sock_fd, sock_peers, sock_peers_sync;
+int sock_client, sock_peers, sock_peers_sync;
 
 pthread_mutex_t mutex;
 
 void exit_handler(int sig){
-    close(sock_fd);
+    close(sock_client);
     close(sock_peers);
     close(sock_peers_sync);
     clean_server_list(head);
@@ -16,11 +16,11 @@ void exit_handler(int sig){
 }
 
 void alarm_handler(int sig){
-  alarm(30);
+  alarm(25);
   check_heartbeat(&head);
   printf("Check heartbeat done\n");
+  print_server_list(head);
 }
-
 
 void * sync_peers(void * arg){
 
@@ -28,11 +28,11 @@ void * sync_peers(void * arg){
   struct workerArgs *wa;
   wa = (struct workerArgs*) arg;
 
-  int sock_fd = wa->sock_fd, file_size;
+  int sock_sync_peers_accepted = wa->sock_fd, file_size;
   struct sockaddr_in sender_addr = wa-> sender_addr;
   servernode *aux = head;
   struct sockaddr_in peer_addr;
-  int nbytes, sock_peer;
+  int nbytes, sock_sync;
   char file_bytes[MAX_FILE_SIZE];
 
   Message msg;
@@ -44,79 +44,85 @@ void * sync_peers(void * arg){
     pthread_exit(NULL);
   }
 
-  nbytes = read(sock_fd, &msg, sizeof(msg));
-  if( nbytes < 0 ){
+  nbytes = read(sock_sync_peers_accepted, &msg, sizeof(msg));
+  if(nbytes < 0){
     perror("Received message: ");
     free(wa);
+    close(sock_sync_peers_accepted);
     pthread_exit(NULL);
   } else if(nbytes == 0){
     printf("Connection closed by the peer..\n");
     free(wa);
+    close(sock_sync_peers_accepted);
     pthread_exit(NULL);
   }
 
   if(msg.type == 0){
-    file_size = read(sock_fd, file_bytes, MAX_FILE_SIZE); //read file
+    file_size = read(sock_sync_peers_accepted, file_bytes, MAX_FILE_SIZE); //read file
     printf("received photo with %d bytes\n", nbytes);
     if( nbytes < 0 ){
       perror("Read: ");
       free(wa);
+      close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
   }
-
 
   while(aux != NULL){
     printf("sending to peer addr %s port %d\nsender addr %s port %d", aux->address, aux->port, inet_ntoa(sender_addr.sin_addr), sender_addr.sin_port);
     peer_addr.sin_family = AF_INET;
     peer_addr.sin_addr.s_addr = inet_addr(aux->address);
     peer_addr.sin_port = htons(aux->port);
-    sock_peer = socket(AF_INET, SOCK_STREAM, 0);
-    if(sock_peer == -1){
+    sock_sync = socket(AF_INET, SOCK_STREAM, 0);
+    if(sock_sync == -1){
       perror("socket: ");
+      close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
 
-    if(connect(sock_peer,(struct sockaddr *) &peer_addr, sizeof(peer_addr)) < 0){
+    if(connect(sock_sync,(struct sockaddr *) &peer_addr, sizeof(peer_addr)) < 0){
       perror("Connect: ");
-      close(sock_peer);
+      close(sock_sync);
+      close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
-    nbytes = write(sock_peer, &msg, sizeof(msg));
+    nbytes = write(sock_sync, &msg, sizeof(msg));
     if(nbytes< 0){
       perror("Write: ");
+      close(sock_sync);
+      close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
 
     if(msg.type == 0){
-      nbytes = write(sock_peer, file_bytes, file_size);
+      nbytes = write(sock_sync, file_bytes, file_size);
       if(nbytes< 0){
         perror("Write: ");
+        close(sock_sync);
+        close(sock_sync_peers_accepted);
         pthread_exit(NULL);
       }
     }
-    close(sock_peer);
     aux = aux->next;
+    close(sock_sync);
   }
+  close(sock_sync_peers_accepted);
   pthread_exit(NULL);
 }
 
 void * peers_server_sync(void * arg){
-
-  //get arguments
-  int sock_fd = *(int*) arg;
 
   struct sockaddr_in peer_addr;
   int newsockfd;
   workerArgs *wa;
   pthread_t thread_id;
 
-  listen(sock_fd, 5);
+  listen(sock_peers_sync, 5);
   socklen_t peer_len = sizeof(peer_addr);
   while(1){
 
       printf("accept sync\n");
-      newsockfd = accept(sock_fd, (struct sockaddr *) &peer_addr, &peer_len);
+      newsockfd = accept(sock_peers_sync, (struct sockaddr *) &peer_addr, &peer_len);
       if(newsockfd < 0){
         close(newsockfd);
         perror("Accept: ");
@@ -129,16 +135,12 @@ void * peers_server_sync(void * arg){
       if(pthread_create(&thread_id, NULL, sync_peers, wa) != 0){
         perror("Could not create thread");
         close(newsockfd);
-        close(sock_fd);
       }
   }
   pthread_exit(NULL);
 }
 
 void * client_server(void * arg){
-
-  // get arguments
-  int sock_fd = *(int*) arg;
 
   message_gw auxm;
   struct sockaddr_in client_addr;
@@ -149,7 +151,7 @@ void * client_server(void * arg){
   while(1){
     //read
     size_addr = sizeof(struct sockaddr_in);
-    nbytes = recvfrom(sock_fd,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & client_addr, &size_addr);
+    nbytes = recvfrom(sock_client,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & client_addr, &size_addr);
     if( nbytes< 0) perror("Read: ");
     printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
 
@@ -160,7 +162,7 @@ void * client_server(void * arg){
       pthread_mutex_unlock(&mutex);
     }
       //send answer for clients
-      nbytes = sendto(sock_fd, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
+      nbytes = sendto(sock_client, &auxm, sizeof(struct message_gw), 0, ( struct sockaddr *) &client_addr, sizeof(client_addr));
       if( nbytes< 0) perror("Write: ");
        printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
     }
@@ -169,9 +171,6 @@ void * client_server(void * arg){
 }
 
 void * peers_server(void * arg){
-
-  // get arguments
-  int sock_fd = *(int*)arg;
 
   //alarm for heartbeat checking
 	struct sigaction sa;
@@ -196,7 +195,7 @@ void * peers_server(void * arg){
   while(1){
     //read
     size_addr = sizeof(struct sockaddr_in);
-    nbytes = recvfrom(sock_fd,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & peer_addr, &size_addr);
+    nbytes = recvfrom(sock_peers,&auxm,sizeof(struct message_gw),0,(struct sockaddr *) & peer_addr, &size_addr);
     if( nbytes< 0) perror("Read: ");
     printf("received: %d %d %s %d\n", nbytes, auxm.type, auxm.address, auxm.port);
 
@@ -219,7 +218,7 @@ void * peers_server(void * arg){
 
       print_server_list(head);
 
-      nbytes = sendto(sock_fd, &auxm2, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
+      nbytes = sendto(sock_peers, &auxm2, sizeof(struct message_gw), 0, ( struct sockaddr *) &peer_addr, sizeof(peer_addr));
       if( nbytes< 0) perror("Write: ");
        printf("replying %d bytes with address %s and port %d\n", nbytes , auxm.address, auxm.port);
 
@@ -264,8 +263,8 @@ int main(int argc, char *argv[]){
      }
 
     /* create client server socket  */
-    sock_fd = socket(AF_INET, SOCK_DGRAM,0);
-    if(sock_fd == -1){
+    sock_client = socket(AF_INET, SOCK_DGRAM,0);
+    if(sock_client == -1){
       perror("socket: ");
       exit(-1);
     }
@@ -277,10 +276,10 @@ int main(int argc, char *argv[]){
     local_addr_client.sin_addr.s_addr = inet_addr(argv[1]);
     local_addr_client.sin_port = htons(portno);
 
-    int err = bind(sock_fd, (struct sockaddr *)&local_addr_client, sizeof(local_addr_client));
+    int err = bind(sock_client, (struct sockaddr *)&local_addr_client, sizeof(local_addr_client));
     if(err == -1){
       perror("bind: ");
-      close(sock_fd);
+      close(sock_client);
       exit(-1);
     }
 
@@ -288,7 +287,7 @@ int main(int argc, char *argv[]){
     sock_peers = socket(AF_INET, SOCK_DGRAM,0);
     if(sock_peers == -1){
       perror("socket: ");
-      close(sock_fd);
+      close(sock_client);
       exit(-1);
     }
 
@@ -302,15 +301,15 @@ int main(int argc, char *argv[]){
     err = bind(sock_peers, (struct sockaddr *)&local_addr_peers, sizeof(local_addr_peers));
     if(err == -1){
       perror("bind: ");
-      close(sock_fd);
+      close(sock_client);
       close(sock_peers);
       exit(-1);
     }
-    //Socket peers sync
 
+    //Socket peers sync
     /* create socket  */
     sock_peers_sync = socket(AF_INET, SOCK_STREAM,0);
-    if(sock_fd == -1){
+    if(sock_client == -1){
       perror("socket: ");
       exit(-1);
     }
@@ -325,7 +324,7 @@ int main(int argc, char *argv[]){
     if(err == -1){
       perror("bind: ");
       close(sock_peers);
-      close(sock_fd);
+      close(sock_client);
       close(sock_peers_sync);
       exit(-1);
     }
@@ -333,26 +332,26 @@ int main(int argc, char *argv[]){
     //Initiate mutex that protects list
     pthread_mutex_init(&mutex, NULL);
 
-    if(pthread_create(&thread_client, NULL, client_server,(void*) &sock_fd) != 0){
+    if(pthread_create(&thread_client, NULL, client_server,NULL) != 0){
       perror("Could not create clients thread");
-      close(sock_fd);
+      close(sock_client);
       close(sock_peers);
       close(sock_peers_sync);
       exit(-1);
     }
 
 
-    if(pthread_create(&thread_peers, NULL, peers_server,(void*) &sock_peers) != 0){
+    if(pthread_create(&thread_peers, NULL, peers_server,NULL) != 0){
       perror("Could not create peers thread");
-      close(sock_fd);
+      close(sock_client);
       close(sock_peers);
       close(sock_peers_sync);
       exit(-1);
     }
 
-    if(pthread_create(&thread_peers_sync, NULL, peers_server_sync,(void*) &sock_peers_sync) != 0){
+    if(pthread_create(&thread_peers_sync, NULL, peers_server_sync,NULL) != 0){
       perror("Could not create peers thread");
-      close(sock_fd);
+      close(sock_client);
       close(sock_peers);
       close(sock_peers_sync);
       exit(-1);
@@ -363,5 +362,4 @@ int main(int argc, char *argv[]){
     }
     // never goes here!
     return 0;
-
 }

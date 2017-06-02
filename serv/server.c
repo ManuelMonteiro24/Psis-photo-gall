@@ -1,9 +1,5 @@
 #include "serverutils.h"
 
-//arg serveraddr(127.0.0.1) serverport(51717) gatewayaddress gatewayport
-
-
-
 //gateway_addr shared by all threads
 struct sockaddr_in gateway_addr;
 struct sockaddr_in gateway_addr_sync;
@@ -19,11 +15,7 @@ char peer_addr[20];
 //Peer photo list thats going to be shared between the threads
 photo* head = NULL;
 
-// NOT THE OPTIMAL WAY TO SYNC BUT FOR NOW workerArgs
-// CHANGE TO a mutex lock in each struct of the list TO DO..
 pthread_mutex_t mutex;
-
-pthread_mutex_t mutex_peers_socket;
 
 //ctrl-c pressed!
 void exit_handler(int sig){
@@ -39,45 +31,28 @@ void exit_handler(int sig){
   nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
   if( nbytes < 0 ) perror("Sending to gateway: ");
   pthread_mutex_destroy(&mutex);
-  pthread_mutex_destroy(&mutex_peers_socket);
   gallery_clean_list(head);
   close(sock_gt);
   close(sock_fd);
   exit(0);
 }
 
-void handler_alarm(int sig){
+void * handle_hearbeat(void * arg){
 
   message_gw auxm;
 
   int nbytes;
 
-  //update heartbeat message
-  auxm.type = 0;
-  strcpy(auxm.address, peer_addr);
-  auxm.port = peer_port;
-  nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
-  if( nbytes < 0 ) perror("Sending to gateway: ");
-  alarm(12);
-}
+  sleep(2);
 
-
-void * handle_hearbeat(void * arg){
-
-  //alarm for heartbeat checking
-  struct sigaction sa_alarm;
-  sa_alarm.sa_handler = &handler_alarm;
-  sa_alarm.sa_flags = 0;
-  sigfillset(&sa_alarm.sa_mask);
-
-  //set first alarm clock 12 seconds
-  alarm(12);
-
-  if(sigaction(SIGALRM, &sa_alarm, 0) == -1){
-    perror("sigaction");
-  }
   while(1){
-
+    //update heartbeat message
+    auxm.type = 0;
+    strcpy(auxm.address, peer_addr);
+    auxm.port = peer_port;
+    nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
+    if( nbytes < 0 ) perror("Sending to gateway: ");
+    sleep(12);
   }
   pthread_exit(NULL);
 
@@ -431,7 +406,6 @@ int main(int argc, char const *argv[]) {
       exit(-1);
     }
     pthread_mutex_init(&mutex,NULL);
-    pthread_mutex_init(&mutex_peers_socket,NULL);
 
     //process message to gateway (register)
     auxm.type = 1;
@@ -472,7 +446,6 @@ int main(int argc, char const *argv[]) {
         nbytes = sendto(sock_gt, &auxm, sizeof( struct message_gw),0, (const struct sockaddr *) &gateway_addr, sizeof(gateway_addr));
         if( nbytes < 0 ) perror("Sending to gateway: ");
         pthread_mutex_destroy(&mutex);
-        pthread_mutex_destroy(&mutex_peers_socket);
         gallery_clean_list(head);
         close(sock_gt);
         close(sock_fd);

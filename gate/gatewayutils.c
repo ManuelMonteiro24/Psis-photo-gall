@@ -42,7 +42,6 @@ int insert_server(servernode **head, char* address, int port){
 int check_heartbeat(servernode **head){
 
   int ret = -1;
-
    //Empty list
    if(*head == NULL)
      return(-1);
@@ -57,9 +56,7 @@ int check_heartbeat(servernode **head){
      }
      aux = aux->next;
    }
-
    return(ret);
-
 }
 
 //-1 error 0 sucess
