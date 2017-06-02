@@ -72,7 +72,8 @@ void * handle_client(void * arg){
 
   struct photo photo_aux;
   Message msg;
-  char file_bytes[MAX_FILE_SIZE], file_name[MAX_WORD_SIZE];
+  char *file_bytes = malloc(MAX_FILE_SIZE), file_name[MAX_WORD_SIZE];
+  char *save_bytes = file_bytes;
   int file_size, fs_aux;
   struct identifier *ids, *aux_id, *rm;
   ids = aux_id = NULL;
@@ -88,6 +89,7 @@ void * handle_client(void * arg){
   if(nbytes< 0){
     perror("Sending to gateway: ");
     free(wa);
+    free(save_bytes);
     close(newsockfd);
     pthread_exit(NULL);
   }
@@ -122,6 +124,7 @@ void * handle_client(void * arg){
           if( nbytes < 0 ){
             perror("Read: ");
             free(wa);
+            free(save_bytes);
             close(newsockfd);
             pthread_exit(NULL);
           }
@@ -135,19 +138,24 @@ void * handle_client(void * arg){
           }
 
           fs_aux = file_size;
+
+          memset(save_bytes, 0, MAX_FILE_SIZE);
+          file_bytes = save_bytes;
           while(fs_aux > 0){
             nbytes = read(newsockfd, file_bytes, fs_aux); //read file
             if(nbytes < 0){
               perror("Read: ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
             fs_aux -= nbytes;
+            file_bytes += nbytes;
           }
 
           pthread_rwlock_wrlock(&rwlock);
-          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, file_bytes, file_size);
+          ret = add_photo(&head, msg.payload, msg.identifier, msg.update, save_bytes, file_size);
           if(ret > 0){
             numbPhotos++;
           }
@@ -157,6 +165,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret: ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
@@ -175,6 +184,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret: ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
@@ -193,6 +203,7 @@ void * handle_client(void * arg){
           if( nbytes < 0 ){
             perror("Write ret type 2(1): ");
             free(wa);
+            free(save_bytes);
             close(newsockfd);
             pthread_exit(NULL);
           }
@@ -201,6 +212,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret type 2(2): ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
@@ -221,6 +233,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write ret: ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
@@ -238,6 +251,7 @@ void * handle_client(void * arg){
           if( nbytes < 0 ){
             perror("Write ret 4: ");
             free(wa);
+            free(save_bytes);
             close(newsockfd);
             pthread_exit(NULL);
           }
@@ -247,6 +261,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write type 4 ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
@@ -262,6 +277,7 @@ void * handle_client(void * arg){
           if( nbytes < 0 ){
             perror("Write ret 4: ");
             free(wa);
+            free(save_bytes);
             close(newsockfd);
             pthread_exit(NULL);
           }
@@ -271,6 +287,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write type 5 ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }
@@ -279,6 +296,7 @@ void * handle_client(void * arg){
             if( nbytes < 0 ){
               perror("Write type 5 ");
               free(wa);
+              free(save_bytes);
               close(newsockfd);
               pthread_exit(NULL);
             }

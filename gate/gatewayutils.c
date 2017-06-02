@@ -82,7 +82,6 @@ int delete_server(servernode **head, char* address, int port){
   servernode *aux = *head;
   servernode *aux0= *head;
 
-
   //Empty list
   if(*head == NULL)
     return(-1);
@@ -94,6 +93,12 @@ int delete_server(servernode **head, char* address, int port){
   }
 
   while(aux !=NULL){
+    //first element of list
+    if(aux == *head && (strcmp(address, aux->address)==0) && (port == aux->port)){
+      *head = aux->next;
+      free(aux);
+      return 0 ;
+    }
     if((strcmp(address, aux->address)==0) && (port == aux->port)){
       //server found
       aux0->next = aux->next;
@@ -152,7 +157,7 @@ int find_server(servernode *head, message_gw* mssg){
   aux = head;
 
   while(aux != NULL){
-    if(aux->available  <= lowOcupServer){
+    if(aux->available  <= lowOcupServer && aux->heartbeat_flag == 1){
       mssg->type = 0;
       strcpy(mssg->address,aux->address);
       mssg->port = aux->port;

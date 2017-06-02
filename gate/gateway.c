@@ -50,7 +50,9 @@ void * sync_peers(void * arg){
   servernode *aux = head;
   struct sockaddr_in peer_addr;
   int nbytes, sock_sync, fs_aux;
-  char file_bytes[MAX_FILE_SIZE];
+  char *file_bytes = malloc(MAX_FILE_SIZE);
+  char *save_bytes = file_bytes;
+
 
   Message msg;
   memset(&msg, -1, sizeof(msg));
@@ -65,11 +67,13 @@ void * sync_peers(void * arg){
   if(nbytes < 0){
     perror("Received message: ");
     free(wa);
+    free(save_bytes);
     close(sock_sync_peers_accepted);
     pthread_exit(NULL);
   } else if(nbytes == 0){
     printf("Connection closed by the peer..\n");
     free(wa);
+    free(save_bytes);
     close(sock_sync_peers_accepted);
     pthread_exit(NULL);
   }
@@ -79,20 +83,25 @@ void * sync_peers(void * arg){
     if( nbytes < 0 ){
       perror("Read file size: ");
       free(wa);
+      free(save_bytes);
       close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
 
     fs_aux = file_size;
+    memset(save_bytes, 0, MAX_FILE_SIZE);
+    file_bytes = save_bytes;
     while(fs_aux > 0){
       nbytes = read(sock_sync_peers_accepted, file_bytes, fs_aux); //read file
       if( nbytes < 0 ){
         perror("Read: ");
         free(wa);
+        free(save_bytes);
         close(sock_sync_peers_accepted);
         pthread_exit(NULL);
       }
       fs_aux -= nbytes;
+      file_bytes += nbytes;
     }
   }
 
@@ -104,6 +113,7 @@ void * sync_peers(void * arg){
     if(sock_sync == -1){
       perror("socket: ");
       free(wa);
+      free(save_bytes);
       close(sock_sync_peers_accepted);
       pthread_exit(NULL);
     }
@@ -113,6 +123,7 @@ void * sync_peers(void * arg){
       close(sock_sync);
       close(sock_sync_peers_accepted);
       free(wa);
+      free(save_bytes);
       pthread_exit(NULL);
     }
     nbytes = write(sock_sync, &msg, sizeof(msg));
@@ -121,6 +132,7 @@ void * sync_peers(void * arg){
       close(sock_sync);
       close(sock_sync_peers_accepted);
       free(wa);
+      free(save_bytes);
       pthread_exit(NULL);
     }
 
@@ -131,6 +143,7 @@ void * sync_peers(void * arg){
         close(sock_sync);
         close(sock_sync_peers_accepted);
         free(wa);
+        free(save_bytes);
         pthread_exit(NULL);
       }
       nbytes = write(sock_sync, file_bytes, file_size);
@@ -139,6 +152,7 @@ void * sync_peers(void * arg){
         close(sock_sync);
         close(sock_sync_peers_accepted);
         free(wa);
+        free(save_bytes);
         pthread_exit(NULL);
       }
     }
@@ -148,6 +162,7 @@ void * sync_peers(void * arg){
 
   close(sock_sync_peers_accepted);
   free(wa);
+  free(save_bytes);
   pthread_exit(NULL);
 }
 
@@ -283,7 +298,7 @@ void * peers_server(void * arg){
       print_server_list(head);
       pthread_rwlock_unlock(&rwlock);
     }else{
-      pthread_rwlock_wrlock(&rwlock); 
+      pthread_rwlock_wrlock(&rwlock);
       delete_server(&head,auxm.address, auxm.port);
       pthread_rwlock_unlock(&rwlock);
 

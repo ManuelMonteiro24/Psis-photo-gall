@@ -265,18 +265,21 @@ int read_file(char file_name[MAX_WORD_SIZE], char *file_bytes, int *file_size){
 int update_database(int updateSocket, photo **head){
   Message msg;
   int nbytes, file_size, fs_aux, numKw, it, it1, numbPhotos;
-  char file_bytes[MAX_FILE_SIZE], kw[MAX_WORD_SIZE];
+  char *file_bytes = malloc(MAX_FILE_SIZE), kw[MAX_WORD_SIZE];
+  char *save_bytes = file_bytes;
 
   msg.type = 6;
   nbytes = write(updateSocket, &msg, sizeof(Message));
   if(nbytes< 0){
     perror("Write: ");
+    free(save_bytes);
     return -1;
   }
 
   nbytes = read(updateSocket, &numbPhotos, 4);
   if(nbytes< 0){
     perror("Read numbPhoto ");
+    free(save_bytes);
     return -1;
   }
 
@@ -286,27 +289,33 @@ int update_database(int updateSocket, photo **head){
     nbytes = read(updateSocket, &msg, sizeof(msg));
     if(nbytes< 0){
       perror("Read msg: ");
+      free(save_bytes);
       return -1;
     }
 
     printf("FILE SIZE SEND DATABASE %d\n", msg.type );
 
     fs_aux = msg.type;
+    memset(save_bytes, 0, MAX_FILE_SIZE);
+    file_bytes = save_bytes;
     while(fs_aux > 0){
       nbytes = read(updateSocket, file_bytes, fs_aux);
       printf("NBYTES: %d\n", nbytes );
       if(nbytes < 0){
         perror("Read file_bytes: ");
+        free(save_bytes);
         return -1;
       }
       fs_aux -= nbytes;
+      file_bytes += nbytes;
     }
 
-    add_photo(head, msg.payload, msg.identifier, msg.update, file_bytes, msg.type);
+    add_photo(head, msg.payload, msg.identifier, msg.update, save_bytes, msg.type);
 
     nbytes = read(updateSocket, &numKw, 4);
     if(nbytes< 0){
       perror("Read numbKw ");
+      free(save_bytes);
       return -1;
     }
 
@@ -316,6 +325,7 @@ int update_database(int updateSocket, photo **head){
 
       if(nbytes < 0){
         perror("Read kw: ");
+        free(save_bytes);
         return -1;
       }
       add_keyword(*head, msg.identifier, kw);
